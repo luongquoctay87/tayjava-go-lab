@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"os"
 
-	_ "github.com/lib/pq"
-
 	"github.com/tayjava/go-lab/internal/api"
 	"github.com/tayjava/go-lab/internal/course"
 )
