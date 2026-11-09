@@ -65,13 +65,26 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	stop() // a second Ctrl+C exits immediately if shutdown hangs
 	log.Println("shutting down...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("http shutdown: %v", err)
+		// Handlers may still call Submit; closing the jobs channel now can panic.
+		log.Printf("http shutdown: %v; skip pool drain", err)
+		return
 	}
-	pool.Close()
-	log.Println("bye")
+
+	drained := make(chan struct{})
+	go func() {
+		pool.Close() // close jobs and wait — drains accepted work
+		close(drained)
+	}()
+	select {
+	case <-drained:
+		log.Println("bye")
+	case <-shutdownCtx.Done():
+		log.Println("pool drain timed out")
+	}
 }

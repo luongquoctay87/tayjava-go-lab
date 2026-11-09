@@ -28,25 +28,25 @@ func Pipeline(ctx context.Context, courseIDs []int64, failID int64) ([]string, e
 		return nil
 	})
 
-	var fetchGroup errgroup.Group
-	fetchGroup.SetLimit(4)
 	g.Go(func() error {
 		defer close(rows)
+		// The first failing fetch cancels fetchCtx, so sibling fetches stop too.
+		fetchGroup, fetchCtx := errgroup.WithContext(ctx)
+		fetchGroup.SetLimit(4)
 		for id := range ids {
-			id := id
 			fetchGroup.Go(func() error {
 				if failID != 0 && id == failID {
 					return fmt.Errorf("export course %d failed", id)
 				}
 				select {
-				case <-ctx.Done():
-					return ctx.Err()
+				case <-fetchCtx.Done():
+					return fetchCtx.Err()
 				case <-time.After(5 * time.Millisecond):
 				}
 				row := fmt.Sprintf("course=%d enrollments=ok", id)
 				select {
-				case <-ctx.Done():
-					return ctx.Err()
+				case <-fetchCtx.Done():
+					return fetchCtx.Err()
 				case rows <- row:
 					return nil
 				}
