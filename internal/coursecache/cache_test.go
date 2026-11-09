@@ -18,3 +18,21 @@ func TestSafeCacheConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestSafeReserveSeat(t *testing.T) {
+	c := NewSafe()
+	c.Put(Course{ID: 1, Title: "Go", Seats: 100})
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.ReserveSeat(1)
+		}()
+	}
+	wg.Wait()
+	got, ok := c.Get(1)
+	if !ok || got.Seats != 0 {
+		t.Fatalf("seats=%d ok=%v want 0", got.Seats, ok)
+	}
+}

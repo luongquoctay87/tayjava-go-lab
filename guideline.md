@@ -7,11 +7,13 @@ Article: [Data races and go test -race in Golang](https://tayjava.com/vi/technol
 
 Show a shared Course cache race and the mutex fix. Make `-race` part of the lab habit for concurrent packages.
 
+`ReserveSeat` on the unsafe cache writes `Seats` with no lock. Concurrent map reads alone are not a data race; the race is that field write (and any map write such as `Put`). The safe cache uses `Seats`, not `capacity` or `seats_left`.
+
 ## Changes vs `lesson-29`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/coursecache` | Unsafe vs Safe cache + concurrent test |
+| `internal/coursecache` | Unsafe vs Safe cache, `ReserveSeat`, concurrent test |
 | `unsafe_race_test.go` | Build-tag demo that fails under `-race` |
 | `README.md` / `guideline.md` | This lesson |
 

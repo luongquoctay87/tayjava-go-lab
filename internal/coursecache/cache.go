@@ -9,7 +9,9 @@ type Course struct {
 	Seats int
 }
 
-// UnsafeCache races on concurrent Get/Put (deliberate bug for lesson 30).
+// UnsafeCache is a deliberate lesson-30 bug. Concurrent map reads alone are
+// not a data race. The race is an unsynchronized write: Put writes the map,
+// and ReserveSeat writes the Seats field.
 type UnsafeCache struct {
 	byID map[int64]*Course
 }
@@ -19,9 +21,17 @@ func NewUnsafe() *UnsafeCache {
 	return &UnsafeCache{byID: make(map[int64]*Course)}
 }
 
-// Put stores c without synchronization.
+// Put stores c without synchronization. A concurrent Put is a map write race.
+// Concurrent Get calls with no writer are not a race by themselves.
 func (c *UnsafeCache) Put(course Course) {
 	c.byID[course.ID] = &course
+}
+
+// ReserveSeat decrements Seats with no lock.
+// Concurrent map reads alone are safe; the race is this field write
+// (and any map write, such as Put).
+func (c *UnsafeCache) ReserveSeat(id int64) {
+	c.byID[id].Seats--
 }
 
 // Get loads by id without synchronization.
@@ -50,6 +60,13 @@ func (c *SafeCache) Put(course Course) {
 	defer c.mu.Unlock()
 	cp := course
 	c.byID[course.ID] = &cp
+}
+
+// ReserveSeat decrements Seats under the write lock.
+func (c *SafeCache) ReserveSeat(id int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.byID[id].Seats--
 }
 
 // Get loads by id under a read lock.
