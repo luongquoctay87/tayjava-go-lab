@@ -1,43 +1,39 @@
-# Lesson 5 — Structs and methods (value vs pointer receivers)
+# Lesson 6 — Small interfaces and composition
 
-Branch: `lesson-05`  
-Article: [Struct và method — value vs pointer receiver](https://tayjava.com/vi/technologies/struct-va-method-value-vs-pointer-receiver)
+Branch: `lesson-06`  
+Article: [Interface nhỏ và composition trong Golang](https://tayjava.com/vi/technologies/interface-nho-va-composition-trong-golang)
 
 ## Goal of this branch
 
-Define a `Course` struct, practice value vs pointer receivers, and see why mutation needs a pointer receiver.
+Define a small `CourseStore` interface, implement memory + stub stores, and inject them into `EnrollmentService` without changing the service.
 
-## Changes vs `lesson-04`
+## Changes vs `lesson-05`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/structdemo/main.go` | `Course` + `Publish` / `Remaining` / `Label` |
+| `cmd/ifacedemo/main.go` | Interface + two store implementations |
 | `guideline.md` | This file |
 
 ## Run
 
 ```bash
-git checkout lesson-05
-go run ./cmd/structdemo
+git checkout lesson-06
+go run ./cmd/ifacedemo
 ```
 
-Expected (shape):
+Expected:
 
 ```text
-after value Publish: false
-after pointer Publish: {ID:1 Title:Go Seats:30 Published:true}
-remaining(5): 25
-label: 1:Go
-{Title:Go Seats:1 Published:true}
-Go Lab Go
+Golang
+Stub Golang
 ```
 
 ## Try yourself
 
-1. Flip `Publish` back to a value receiver and watch `Published` stay `false`.
-2. Call `WithTitle` and confirm the original title is unchanged.
-3. Add an embedded `Timestamps` struct and print a promoted field.
+1. Call `EnrollTitle` with a missing ID and print the error.
+2. Add a third store (e.g. logging wrapper) without editing `EnrollmentService`.
+3. Embed `CourseStore` into a larger interface that also has `Close()`.
 
 ## What the next lesson adds
 
-**Lesson 6** — small interfaces and composition: `cmd/ifacedemo` with `CourseStore` + `EnrollmentService`.
+**Lesson 7** — slices and maps: add `cmd/collections` with Course indexing by ID.
