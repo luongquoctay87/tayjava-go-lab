@@ -17,6 +17,7 @@ import (
 	"github.com/tayjava/go-lab/internal/api"
 	"github.com/tayjava/go-lab/internal/config"
 	"github.com/tayjava/go-lab/internal/course"
+	"github.com/tayjava/go-lab/internal/metrics"
 	"github.com/tayjava/go-lab/internal/notify"
 )
 
@@ -40,11 +41,13 @@ func main() {
 
 	repo := course.NewPostgresRepo(db)
 	svc := course.NewService(repo)
+	counters := &metrics.Counters{}
 	courses := api.NewCourseHandler(svc, cfg.EnrollmentCapDefault)
-	enrollments := api.NewEnrollmentHandler(svc, pool)
+	enrollments := api.NewEnrollmentHandler(svc, pool, counters)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
+	mux.HandleFunc("GET /metrics", counters.Handler())
 	mux.HandleFunc("GET /courses/{id}", courses.Get)
 	mux.HandleFunc("POST /courses", courses.Create)
 	mux.HandleFunc("POST /courses/{id}/enrollments", enrollments.CreateNested)

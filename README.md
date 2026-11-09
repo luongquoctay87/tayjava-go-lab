@@ -92,6 +92,7 @@ docker compose up --build
 | `lesson-31` | 31 | Generics helpers (Unique / First) |
 | `lesson-32` | 32 | Benchmarks + localhost pprof |
 | `lesson-33` | 33 | slog JSON + request_id / course_id |
+| `lesson-34` | 34 | Enroll counters + GET /metrics |
 
 ## Conventions
 

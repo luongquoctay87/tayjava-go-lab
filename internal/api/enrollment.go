@@ -7,20 +7,24 @@ import (
 	"net/http"
 	"strconv"
 
+	"time"
+
 	"github.com/tayjava/go-lab/internal/course"
+	"github.com/tayjava/go-lab/internal/metrics"
 	"github.com/tayjava/go-lab/internal/notify"
 )
 
 // EnrollmentHandler exposes enrollment HTTP endpoints.
 type EnrollmentHandler struct {
-	svc    *course.Service
-	notify *notify.Pool
+	svc     *course.Service
+	notify  *notify.Pool
+	metrics *metrics.Counters
 }
 
 // NewEnrollmentHandler constructs an EnrollmentHandler.
-// notify may be nil (no post-enroll fan-out).
-func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool) EnrollmentHandler {
-	return EnrollmentHandler{svc: svc, notify: pool}
+// notify / metrics may be nil.
+func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool, m *metrics.Counters) EnrollmentHandler {
+	return EnrollmentHandler{svc: svc, notify: pool, metrics: m}
 }
 
 type enrollBody struct {
@@ -77,8 +81,10 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		"course_id", courseID,
 		"user_id", in.UserID,
 	)
+	start := time.Now()
 	en, err := h.svc.Enroll(r.Context(), courseID, in.UserID)
 	if err != nil {
+		h.observe(false, time.Since(start))
 		slog.Error("enroll_failed",
 			"request_id", RequestIDFrom(r.Context()),
 			"course_id", courseID,
@@ -88,6 +94,7 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		MapDomainError(w, err)
 		return
 	}
+	h.observe(true, time.Since(start))
 	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
 }
@@ -128,8 +135,10 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		"course_id", in.CourseID,
 		"user_id", in.UserID,
 	)
+	start := time.Now()
 	en, err := h.svc.Enroll(r.Context(), in.CourseID, in.UserID)
 	if err != nil {
+		h.observe(false, time.Since(start))
 		slog.Error("enroll_failed",
 			"request_id", RequestIDFrom(r.Context()),
 			"course_id", in.CourseID,
@@ -139,8 +148,15 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		MapDomainError(w, err)
 		return
 	}
+	h.observe(true, time.Since(start))
 	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
+}
+
+func (h EnrollmentHandler) observe(ok bool, d time.Duration) {
+	if h.metrics != nil {
+		h.metrics.ObserveEnroll(ok, d)
+	}
 }
 
 func (h EnrollmentHandler) submitNotify(r *http.Request, en course.Enrollment) {
