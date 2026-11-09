@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
 	"time"
@@ -56,6 +57,14 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// pprof on localhost only — never expose :6060 publicly in the lab.
+	go func() {
+		log.Println("pprof listening on 127.0.0.1:6060")
+		if err := http.ListenAndServe("127.0.0.1:6060", nil); err != nil {
+			log.Printf("pprof: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("listening on %s", cfg.HTTPAddr)
