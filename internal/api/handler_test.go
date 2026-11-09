@@ -19,10 +19,6 @@ func newTestHandler() http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
-	mux.HandleFunc("GET /courses/{id}", courses.Get)
-	mux.HandleFunc("POST /courses", courses.Create)
-	mux.HandleFunc("POST /courses/{id}/enrollments", enrollments.CreateNested)
-	mux.HandleFunc("GET /courses/{id}/enrollments", enrollments.List)
 	mux.HandleFunc("GET /api/courses/{id}", courses.Get)
 	mux.HandleFunc("POST /api/courses", courses.Create)
 	mux.HandleFunc("POST /api/enrollments", enrollments.Create)
@@ -38,7 +34,7 @@ func TestAPILayers(t *testing.T) {
 
 	t.Run("get seeded course", func(t *testing.T) {
 		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/courses/1", nil))
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/courses/1", nil))
 		if rr.Code != http.StatusOK {
 			t.Fatalf("status %d", rr.Code)
 		}
@@ -52,20 +48,23 @@ func TestAPILayers(t *testing.T) {
 	})
 
 	t.Run("enroll until no seats", func(t *testing.T) {
+		body1 := `{"courseId":1,"userId":7}`
 		rr1 := httptest.NewRecorder()
-		h.ServeHTTP(rr1, httptest.NewRequest(http.MethodPost, "/courses/1/enrollments", strings.NewReader(`{"userId":7}`)))
+		h.ServeHTTP(rr1, httptest.NewRequest(http.MethodPost, "/api/enrollments", strings.NewReader(body1)))
 		if rr1.Code != http.StatusCreated {
 			t.Fatalf("first enroll status %d body=%s", rr1.Code, rr1.Body.String())
 		}
 
+		body2 := `{"courseId":1,"userId":8}`
 		rr2 := httptest.NewRecorder()
-		h.ServeHTTP(rr2, httptest.NewRequest(http.MethodPost, "/courses/1/enrollments", strings.NewReader(`{"userId":8}`)))
+		h.ServeHTTP(rr2, httptest.NewRequest(http.MethodPost, "/api/enrollments", strings.NewReader(body2)))
 		if rr2.Code != http.StatusCreated {
 			t.Fatalf("second enroll status %d", rr2.Code)
 		}
 
+		body3 := `{"courseId":1,"userId":9}`
 		rr3 := httptest.NewRecorder()
-		h.ServeHTTP(rr3, httptest.NewRequest(http.MethodPost, "/courses/1/enrollments", strings.NewReader(`{"userId":9}`)))
+		h.ServeHTTP(rr3, httptest.NewRequest(http.MethodPost, "/api/enrollments", strings.NewReader(body3)))
 		if rr3.Code != http.StatusConflict {
 			t.Fatalf("third enroll status %d want 409", rr3.Code)
 		}
@@ -78,9 +77,9 @@ func TestAPILayers(t *testing.T) {
 		}
 	})
 
-	t.Run("validation userId zero", func(t *testing.T) {
+	t.Run("validation courseId zero", func(t *testing.T) {
 		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/courses/1/enrollments", strings.NewReader(`{"userId":0}`)))
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/enrollments", strings.NewReader(`{"courseId":0,"userId":7}`)))
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("status %d want 400", rr.Code)
 		}
@@ -96,7 +95,7 @@ func TestAPILayers(t *testing.T) {
 	t.Run("create course", func(t *testing.T) {
 		body := `{"title":"Pointers","seats":10,"level":"beginner"}`
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/courses", strings.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/courses", strings.NewReader(body))
 		h.ServeHTTP(rr, req)
 		if rr.Code != http.StatusCreated {
 			t.Fatalf("status %d body=%s", rr.Code, rr.Body.String())

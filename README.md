@@ -42,7 +42,9 @@ Lesson 27 Intermediate lab:
 git checkout lesson-27
 go test ./...
 docker compose up --build
-# curl -d '{"title":"Go Intermediate","seats":2}' -H 'Content-Type: application/json' http://localhost:8080/courses
+# curl -d '{"title":"Go Intermediate","seats":2}' -H 'Content-Type: application/json' http://localhost:8080/api/courses
+# curl -d '{"courseId":1,"userId":7}' -H 'Content-Type: application/json' http://localhost:8080/api/enrollments
+# curl -s http://localhost:8080/api/courses/1
 ```
 
 ## How to learn with this repo
@@ -106,6 +108,7 @@ tayjava-go-lab/
 ├── .dockerignore
 ├── .env.example
 ├── db-ddl.sql
+├── migrations/              # lesson 22 up/down SQL
 ├── go.mod
 ├── main.go
 ├── course/

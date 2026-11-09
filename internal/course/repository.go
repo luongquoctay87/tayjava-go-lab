@@ -2,7 +2,6 @@ package course
 
 import (
 	"context"
-	"fmt"
 	"sync"
 )
 
@@ -10,18 +9,20 @@ import (
 type Repository interface {
 	Get(ctx context.Context, id int64) (Course, error)
 	Save(ctx context.Context, c Course) (Course, error)
-	CountEnrollments(ctx context.Context, courseID int64) (int, error)
-	InsertEnrollment(ctx context.Context, courseID, userID int64) (Enrollment, error)
-	ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error)
+	Enroll(ctx context.Context, courseID, userID int64) error
 }
 
-// MemoryRepo is an in-process Course + Enrollment store for unit tests.
+type enrollKey struct {
+	courseID int64
+	userID   int64
+}
+
+// MemoryRepo is an in-process Course store for unit tests and DB-free demos.
 type MemoryRepo struct {
-	mu          sync.Mutex
-	data        map[int64]Course
-	enrollments map[int64]Enrollment
-	seq         int64
-	enrollSeq   int64
+	mu       sync.Mutex
+	data     map[int64]Course
+	enrolled map[enrollKey]struct{}
+	seq      int64
 }
 
 // NewMemoryRepo seeds one Course so enroll demos work without Postgres.
@@ -30,8 +31,8 @@ func NewMemoryRepo() *MemoryRepo {
 		data: map[int64]Course{
 			1: {ID: 1, Title: "Go Context", Seats: 2, Level: "intermediate"},
 		},
-		enrollments: make(map[int64]Enrollment),
-		seq:         1,
+		enrolled: make(map[enrollKey]struct{}),
+		seq:      1,
 	}
 }
 
@@ -70,53 +71,26 @@ func (m *MemoryRepo) Save(ctx context.Context, c Course) (Course, error) {
 	return c, nil
 }
 
-// CountEnrollments returns how many users are enrolled in a course.
-func (m *MemoryRepo) CountEnrollments(ctx context.Context, courseID int64) (int, error) {
+// Enroll takes one seat and records the enrollment under a single lock.
+func (m *MemoryRepo) Enroll(ctx context.Context, courseID, userID int64) error {
 	if err := ctx.Err(); err != nil {
-		return 0, err
+		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	n := 0
-	for _, e := range m.enrollments {
-		if e.CourseID == courseID {
-			n++
-		}
+	c, ok := m.data[courseID]
+	if !ok {
+		return ErrNotFound
 	}
-	return n, nil
-}
-
-// InsertEnrollment records a new enrollment or ErrConflict if duplicate.
-func (m *MemoryRepo) InsertEnrollment(ctx context.Context, courseID, userID int64) (Enrollment, error) {
-	if err := ctx.Err(); err != nil {
-		return Enrollment{}, err
+	if c.Seats <= 0 {
+		return ErrNoSeats
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := fmt.Sprintf("%d:%d", courseID, userID)
-	for _, e := range m.enrollments {
-		if fmt.Sprintf("%d:%d", e.CourseID, e.UserID) == key {
-			return Enrollment{}, ErrConflict
-		}
+	key := enrollKey{courseID: courseID, userID: userID}
+	if _, dup := m.enrolled[key]; dup {
+		return ErrConflict
 	}
-	m.enrollSeq++
-	e := Enrollment{ID: m.enrollSeq, CourseID: courseID, UserID: userID}
-	m.enrollments[e.ID] = e
-	return e, nil
-}
-
-// ListEnrollments returns all enrollments for a course.
-func (m *MemoryRepo) ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	out := make([]Enrollment, 0)
-	for _, e := range m.enrollments {
-		if e.CourseID == courseID {
-			out = append(out, e)
-		}
-	}
-	return out, nil
+	c.Seats--
+	m.data[courseID] = c
+	m.enrolled[key] = struct{}{}
+	return nil
 }

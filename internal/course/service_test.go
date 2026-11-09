@@ -49,10 +49,10 @@ func TestServiceEnroll(t *testing.T) {
 			}
 			svc := course.NewService(repo)
 
-			if _, err := svc.Enroll(ctx, 10, tt.firstUID); err != nil {
+			if err := svc.Enroll(ctx, 10, tt.firstUID); err != nil {
 				t.Fatalf("first enroll: %v", err)
 			}
-			_, err = svc.Enroll(ctx, 10, tt.second.uid)
+			err = svc.Enroll(ctx, 10, tt.second.uid)
 			if !errors.Is(err, tt.second.wantErr) {
 				t.Fatalf("second enroll: got %v want %v", err, tt.second.wantErr)
 			}
@@ -62,7 +62,7 @@ func TestServiceEnroll(t *testing.T) {
 
 func TestServiceEnrollNotFound(t *testing.T) {
 	svc := course.NewService(course.NewMemoryRepo())
-	_, err := svc.Enroll(context.Background(), 999, 1)
+	err := svc.Enroll(context.Background(), 999, 1)
 	if !errors.Is(err, course.ErrNotFound) {
 		t.Fatalf("got %v want ErrNotFound", err)
 	}
@@ -87,17 +87,33 @@ func TestServiceCreateAndGet(t *testing.T) {
 	}
 }
 
-func TestServiceListEnrollments(t *testing.T) {
-	ctx := context.Background()
-	svc := course.NewService(course.NewMemoryRepo())
-	if _, err := svc.Enroll(ctx, 1, 7); err != nil {
-		t.Fatal(err)
+type fakeRepo struct {
+	getErr error
+}
+
+func (f fakeRepo) Get(ctx context.Context, id int64) (course.Course, error) {
+	if f.getErr != nil {
+		return course.Course{}, f.getErr
 	}
-	list, err := svc.ListEnrollments(ctx, 1)
-	if err != nil {
-		t.Fatal(err)
+	return course.Course{}, course.ErrNotFound
+}
+
+func (f fakeRepo) Save(ctx context.Context, c course.Course) (course.Course, error) {
+	return c, nil
+}
+
+func (f fakeRepo) Enroll(ctx context.Context, courseID, userID int64) error {
+	return nil
+}
+
+func TestServiceEnrollDBErrorIsNotNotFound(t *testing.T) {
+	dbErr := errors.New("connection refused")
+	svc := course.NewService(fakeRepo{getErr: dbErr})
+	err := svc.Enroll(context.Background(), 1, 7)
+	if errors.Is(err, course.ErrNotFound) {
+		t.Fatal("database error must not become ErrNotFound")
 	}
-	if len(list) != 1 || list[0].UserID != 7 {
-		t.Fatalf("list=%+v", list)
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("got %v want wrapped database error", err)
 	}
 }

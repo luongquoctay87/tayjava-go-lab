@@ -4,10 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
 )
+
+// pgUniqueViolation is the Postgres SQLSTATE for unique_violation.
+const pgUniqueViolation = "23505"
 
 // PostgresRepo persists Course and Enrollment rows with database/sql.
 type PostgresRepo struct {
@@ -55,49 +59,32 @@ func (p *PostgresRepo) Save(ctx context.Context, c Course) (Course, error) {
 	return c, nil
 }
 
-// CountEnrollments returns enrollment rows for a course.
-func (p *PostgresRepo) CountEnrollments(ctx context.Context, courseID int64) (int, error) {
-	const q = `SELECT COUNT(*) FROM enrollments WHERE course_id = $1`
-	var n int
-	err := p.db.QueryRowContext(ctx, q, courseID).Scan(&n)
-	return n, err
-}
-
-// InsertEnrollment inserts a row; unique (course_id, user_id) maps to ErrConflict.
-func (p *PostgresRepo) InsertEnrollment(ctx context.Context, courseID, userID int64) (Enrollment, error) {
-	const q = `
-INSERT INTO enrollments (course_id, user_id) VALUES ($1, $2)
-RETURNING id, course_id, user_id`
-	var e Enrollment
-	err := p.db.QueryRowContext(ctx, q, courseID, userID).Scan(&e.ID, &e.CourseID, &e.UserID)
+// Enroll decrements seats and inserts an enrollment as two statements, with no transaction.
+// A lost INSERT leaves the seat taken; lesson 38 wraps both in one transaction.
+func (p *PostgresRepo) Enroll(ctx context.Context, courseID, userID int64) error {
+	res, err := p.db.ExecContext(ctx,
+		`UPDATE courses SET seats = seats - 1 WHERE id = $1 AND seats > 0`, courseID)
 	if err != nil {
-		var pqErr *pq.Error
-		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-			return Enrollment{}, ErrConflict
-		}
-		return Enrollment{}, err
+		return fmt.Errorf("reserve seat: %w", err)
 	}
-	return e, nil
-}
-
-// ListEnrollments returns enrollments for a course ordered by id.
-func (p *PostgresRepo) ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error) {
-	const q = `SELECT id, course_id, user_id FROM enrollments WHERE course_id = $1 ORDER BY id`
-	rows, err := p.db.QueryContext(ctx, q, courseID)
+	n, err := res.RowsAffected()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("reserve seat: %w", err)
 	}
-	defer rows.Close()
+	if n == 0 {
+		return ErrNoSeats
+	}
 
-	out := make([]Enrollment, 0)
-	for rows.Next() {
-		var e Enrollment
-		if err := rows.Scan(&e.ID, &e.CourseID, &e.UserID); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
+	_, err = p.db.ExecContext(ctx,
+		`INSERT INTO enrollments (course_id, user_id) VALUES ($1, $2)`, courseID, userID)
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && string(pqErr.Code) == pgUniqueViolation {
+		return ErrConflict
 	}
-	return out, rows.Err()
+	if err != nil {
+		return fmt.Errorf("insert enrollment: %w", err)
+	}
+	return nil
 }
 
 // OpenDB opens a Postgres pool and verifies connectivity with PingContext.
