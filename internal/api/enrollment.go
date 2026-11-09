@@ -12,6 +12,7 @@ import (
 	"github.com/tayjava/go-lab/internal/course"
 	"github.com/tayjava/go-lab/internal/metrics"
 	"github.com/tayjava/go-lab/internal/notify"
+	"github.com/tayjava/go-lab/internal/resilience"
 )
 
 // EnrollmentHandler exposes enrollment HTTP endpoints.
@@ -19,12 +20,13 @@ type EnrollmentHandler struct {
 	svc     *course.Service
 	notify  *notify.Pool
 	metrics *metrics.Counters
+	idem    *resilience.IdempotencyStore
 }
 
 // NewEnrollmentHandler constructs an EnrollmentHandler.
-// notify / metrics may be nil.
-func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool, m *metrics.Counters) EnrollmentHandler {
-	return EnrollmentHandler{svc: svc, notify: pool, metrics: m}
+// notify / metrics / idem may be nil.
+func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool, m *metrics.Counters, idem *resilience.IdempotencyStore) EnrollmentHandler {
+	return EnrollmentHandler{svc: svc, notify: pool, metrics: m, idem: idem}
 }
 
 type enrollBody struct {
@@ -76,27 +78,7 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	slog.Info("enroll_attempt",
-		"request_id", RequestIDFrom(r.Context()),
-		"course_id", courseID,
-		"user_id", in.UserID,
-	)
-	start := time.Now()
-	en, err := h.svc.Enroll(r.Context(), courseID, in.UserID)
-	if err != nil {
-		h.observe(false, time.Since(start))
-		slog.Error("enroll_failed",
-			"request_id", RequestIDFrom(r.Context()),
-			"course_id", courseID,
-			"user_id", in.UserID,
-			"err", err.Error(),
-		)
-		MapDomainError(w, err)
-		return
-	}
-	h.observe(true, time.Since(start))
-	h.submitNotify(r, en)
-	WriteJSON(w, http.StatusCreated, en)
+	h.enroll(w, r, courseID, in.UserID)
 }
 
 // List handles GET /courses/{id}/enrollments.
@@ -130,25 +112,41 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
+	h.enroll(w, r, in.CourseID, in.UserID)
+}
+
+func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, courseID, userID int64) {
+	key := r.Header.Get("Idempotency-Key")
 	slog.Info("enroll_attempt",
 		"request_id", RequestIDFrom(r.Context()),
-		"course_id", in.CourseID,
-		"user_id", in.UserID,
+		"course_id", courseID,
+		"user_id", userID,
+		"idempotency_key", key,
 	)
+	if key != "" && h.idem != nil {
+		if id, ok := h.idem.Get(key); ok {
+			WriteJSON(w, http.StatusOK, course.Enrollment{ID: id, CourseID: courseID, UserID: userID})
+			return
+		}
+	}
+
 	start := time.Now()
-	en, err := h.svc.Enroll(r.Context(), in.CourseID, in.UserID)
+	en, err := h.svc.Enroll(r.Context(), courseID, userID)
 	if err != nil {
 		h.observe(false, time.Since(start))
 		slog.Error("enroll_failed",
 			"request_id", RequestIDFrom(r.Context()),
-			"course_id", in.CourseID,
-			"user_id", in.UserID,
+			"course_id", courseID,
+			"user_id", userID,
 			"err", err.Error(),
 		)
 		MapDomainError(w, err)
 		return
 	}
 	h.observe(true, time.Since(start))
+	if key != "" && h.idem != nil {
+		h.idem.Put(key, en.ID)
+	}
 	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
 }

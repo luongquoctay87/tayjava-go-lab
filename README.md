@@ -93,6 +93,7 @@ docker compose up --build
 | `lesson-32` | 32 | Benchmarks + localhost pprof |
 | `lesson-33` | 33 | slog JSON + request_id / course_id |
 | `lesson-34` | 34 | Enroll counters + GET /metrics |
+| `lesson-35` | 35 | Retry/backoff + Idempotency-Key |
 
 ## Conventions
 

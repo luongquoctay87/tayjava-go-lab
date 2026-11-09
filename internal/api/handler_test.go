@@ -15,7 +15,7 @@ func newTestHandler() http.Handler {
 	repo := course.NewMemoryRepo()
 	svc := course.NewService(repo)
 	courses := api.NewCourseHandler(svc, 30)
-	enrollments := api.NewEnrollmentHandler(svc, nil, nil)
+	enrollments := api.NewEnrollmentHandler(svc, nil, nil, nil)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)

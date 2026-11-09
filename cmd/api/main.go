@@ -19,6 +19,7 @@ import (
 	"github.com/tayjava/go-lab/internal/course"
 	"github.com/tayjava/go-lab/internal/metrics"
 	"github.com/tayjava/go-lab/internal/notify"
+	"github.com/tayjava/go-lab/internal/resilience"
 )
 
 func main() {
@@ -43,7 +44,7 @@ func main() {
 	svc := course.NewService(repo)
 	counters := &metrics.Counters{}
 	courses := api.NewCourseHandler(svc, cfg.EnrollmentCapDefault)
-	enrollments := api.NewEnrollmentHandler(svc, pool, counters)
+	enrollments := api.NewEnrollmentHandler(svc, pool, counters, resilience.NewIdempotencyStore())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
