@@ -94,6 +94,7 @@ docker compose up --build
 | `lesson-33` | 33 | slog JSON + request_id / course_id |
 | `lesson-34` | 34 | Enroll counters + GET /metrics |
 | `lesson-35` | 35 | Retry/backoff + Idempotency-Key |
+| `lesson-36` | 36 | JWT Bearer middleware (`JWT_SECRET`) |
 
 ## Conventions
 

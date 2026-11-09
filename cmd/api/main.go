@@ -15,6 +15,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/tayjava/go-lab/internal/api"
+	"github.com/tayjava/go-lab/internal/auth"
 	"github.com/tayjava/go-lab/internal/config"
 	"github.com/tayjava/go-lab/internal/course"
 	"github.com/tayjava/go-lab/internal/metrics"
@@ -49,13 +50,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
 	mux.HandleFunc("GET /metrics", counters.Handler())
+	mux.HandleFunc("POST /login", auth.LoginHandler)
 	mux.HandleFunc("GET /courses/{id}", courses.Get)
 	mux.HandleFunc("POST /courses", courses.Create)
-	mux.HandleFunc("POST /courses/{id}/enrollments", enrollments.CreateNested)
+	mux.Handle("POST /courses/{id}/enrollments", auth.Bearer(http.HandlerFunc(enrollments.CreateNested)))
 	mux.HandleFunc("GET /courses/{id}/enrollments", enrollments.List)
 	mux.HandleFunc("GET /api/courses/{id}", courses.Get)
 	mux.HandleFunc("POST /api/courses", courses.Create)
-	mux.HandleFunc("POST /api/enrollments", enrollments.Create)
+	mux.Handle("POST /api/enrollments", auth.Bearer(http.HandlerFunc(enrollments.Create)))
 
 	var h http.Handler = mux
 	h = api.Recovery(h)
