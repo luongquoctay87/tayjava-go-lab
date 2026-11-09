@@ -14,7 +14,7 @@ import (
 func newTestHandler() http.Handler {
 	repo := course.NewMemoryRepo()
 	svc := course.NewService(repo)
-	courses := api.NewCourseHandler(svc)
+	courses := api.NewCourseHandler(svc, 30)
 	enrollments := api.NewEnrollmentHandler(svc)
 
 	mux := http.NewServeMux()

@@ -11,12 +11,17 @@ import (
 
 // CourseHandler exposes Course HTTP endpoints.
 type CourseHandler struct {
-	svc *course.Service
+	svc      *course.Service
+	seatCap  int
 }
 
 // NewCourseHandler constructs a CourseHandler.
-func NewCourseHandler(svc *course.Service) CourseHandler {
-	return CourseHandler{svc: svc}
+// seatCapDefault is applied when the create body omits seats / sends 0.
+func NewCourseHandler(svc *course.Service, seatCapDefault int) CourseHandler {
+	if seatCapDefault < 1 {
+		seatCapDefault = 30
+	}
+	return CourseHandler{svc: svc, seatCap: seatCapDefault}
 }
 
 type createCourseIn struct {
@@ -71,9 +76,13 @@ func (h CourseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
+	seats := in.Seats
+	if seats == 0 {
+		seats = h.seatCap
+	}
 	created, err := h.svc.CreateCourse(r.Context(), course.Course{
 		Title: in.Title,
-		Seats: in.Seats,
+		Seats: seats,
 		Level: in.Level,
 	})
 	if err != nil {
