@@ -5,7 +5,7 @@ Article: [Goroutine trong Golang là gì? Chạy hàm đồng thời đúng các
 
 ## Goal of this branch
 
-Start goroutines with `go`, wait with `sync.WaitGroup`, and recognize why fire-and-forget (no join) drops work when `main` returns.
+Start goroutines with `go`, wait with `sync.WaitGroup`, and recognize why fire-and-forget (no join) drops work when `main` returns. The loop variable is not copied: `go 1.22` in `go.mod` already gives each iteration its own variable. `email := email` is only for a module whose `go` line is below 1.22.
 
 ## Changes vs `lesson-13`
 

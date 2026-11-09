@@ -25,7 +25,8 @@ func notifyConcurrent(courseID int64, emails []string) {
 	var wg sync.WaitGroup
 	wg.Add(len(emails))
 	for _, email := range emails {
-		email := email // safe habit across Go versions
+		// This module declares go 1.22, so each iteration already has its own email.
+		// email := email is only for a go.mod that declares a version below 1.22.
 		go func() {
 			defer wg.Done()
 			enrollNotify(courseID, email)
