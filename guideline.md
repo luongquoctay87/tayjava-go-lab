@@ -1,43 +1,34 @@
-# Lesson 40 — Package design and backward compatibility
+# Lesson 42 — Go vs JVM vs Node (worker binary)
 
-Branch: `lesson-40`  
-Article: [Golang package design and backward compatibility](https://tayjava.com/vi/technologies/golang-package-design-and-backward-compatibility)
+Branch: `lesson-42` (from `lesson-40`; **skips lesson-41**)  
+Article: [Go vs JVM vs Node — picking Golang trade-offs](https://tayjava.com/vi/technologies/go-vs-jvm-vs-node-picking-golang-trade-offs-for-your-team)
+
+## Why lesson-41 is skipped
+
+Lesson 41 is a **system-design** brief (sync/async/hybrid ADR, peak enrollment pitch). No new production code is required beyond what lesson 39 already demonstrates (bounded queue + 503). Read the article for the half-page ADR; this lab path continues at 42 with a concrete `cmd/worker`.
 
 ## Goal of this branch
 
-Tighten package boundaries: keep SQL/HTTP under `internal`, document exported symbols, add an additive JSON field (`subtitle`), and record why enrollment is not a separate module yet.
+Ship a small standalone `cmd/worker` and an ADR scoring Go vs JVM vs Node for the enrollment worker — not a Course CRUD rewrite.
 
-## Changes vs `lesson-39`
+## Changes vs `lesson-40`
 
 | Add / change | Why |
 |--------------|-----|
-| `docs/adr-001-enrollment-module.md` | Short ADR: stay mono-module |
-| `internal/course/model.go` | Additive `subtitle` JSON field |
-| `README.md` / `guideline.md` | Export inventory + this lesson |
+| `cmd/worker` | Standalone Go worker binary |
+| `docs/adr-002-go-vs-jvm-node.md` | Trade-off ADR |
+| `README.md` / `guideline.md` | Skip-41 note + this lesson |
 
-`db-ddl.sql` unchanged (subtitle is API-only for now; persistence can ignore omitempty).
-
-## Export inventory (who imports?)
-
-| Symbol / package | Importers |
-|------------------|-----------|
-| `course` (root) | Early demos (`cmd/coursedemo`, benches) |
-| `internal/course` | `cmd/api`, `internal/api`, `internal/enrollment` |
-| `internal/enrollment` | `cmd/api` only |
-| `internal/auth` | `cmd/api` |
-| `internal/notify` | `cmd/api`, `internal/api` |
-
-Rule of thumb: prefer `internal/` for anything with SQL or HTTP wiring.
+`db-ddl.sql` unchanged.
 
 ## Run
 
 ```bash
-git checkout lesson-40
-go test ./...
+git checkout lesson-42
+export DATABASE_URL=postgres://tayjava:tayjava@localhost:5432/tayjava?sslmode=disable
+go build -o bin/worker ./cmd/worker
 go build ./...
-cat docs/adr-001-enrollment-module.md
+cat docs/adr-002-go-vs-jvm-node.md
 ```
 
-## Skipped next
-
-**Lesson 41** (system design ADR / peak enrollment) is documentation-heavy; skipped in this lab path — see article for the sync/async brief. Continue to **lesson 42** (`cmd/worker` + Go vs JVM vs Node ADR).
+`go run ./cmd/worker` needs Postgres + a course id=1 (Compose from lesson 27). SIGTERM drains the queue.
