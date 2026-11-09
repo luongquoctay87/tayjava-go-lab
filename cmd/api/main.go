@@ -1,8 +1,12 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -12,6 +16,12 @@ import (
 )
 
 func main() {
+	healthcheck := flag.Bool("healthcheck", false, "probe /healthz then exit 0 (healthy) or 1")
+	flag.Parse()
+	if *healthcheck {
+		os.Exit(probe())
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
@@ -41,4 +51,27 @@ func main() {
 
 	log.Printf("listening on %s", cfg.HTTPAddr)
 	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, h))
+}
+
+// probe runs inside the container, so it reaches the server via 127.0.0.1.
+// It runs before config.Load and does not require DATABASE_URL.
+func probe() int {
+	addr := os.Getenv("HTTP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 1
+	}
+	client := http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://" + net.JoinHostPort("127.0.0.1", port) + "/healthz")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
