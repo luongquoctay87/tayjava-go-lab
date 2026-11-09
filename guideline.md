@@ -1,43 +1,46 @@
-# Lesson 11 — Pointers when you need them
+# Lesson 12 — defer, panic, recover (use them in the right place)
 
-Branch: `lesson-11`  
-Article: [Pointer đủ dùng trong Golang](https://tayjava.com/vi/technologies/pointer-du-dung-trong-golang)
+Branch: `lesson-12`  
+Article: [defer, panic, recover — dùng đúng chỗ](https://tayjava.com/vi/technologies/defer-panic-recover-dung-dung-cho)
 
 ## Goal of this branch
 
-Mutate `Course.Seats` through a pointer (`Reserve`), contrast with pass-by-value (`ReserveCopy`), and handle `nil` safely.
+Use `defer` for cleanup (`Close`), demonstrate LIFO defer order, recover a panic once, then prefer returning `error` for expected failures.
 
-## Changes vs `lesson-10`
+## Changes vs `lesson-11`
 
 | Add / change | Why |
 |--------------|-----|
-| `course/reserve.go` | `Reserve(*Course)` + `ReserveCopy(Course)` |
-| `cmd/ptrdemo/main.go` | Runnable pointer demo |
+| `cmd/deferdemo/main.go` | `readCourses`, panic/recover, error refactor |
 | `guideline.md` | This file |
 
 ## Run
 
 ```bash
-git checkout lesson-11
-go run ./cmd/ptrdemo
-go test ./...
+git checkout lesson-12
+go run ./cmd/deferdemo
 ```
 
 Expected (shape):
 
 ```text
-before reserve: 30
-after reserve: 29
-after reserveCopy (unchanged): 29 (was 29 )
-reserve nil: course is nil
+body
+second defer
+first defer
+read bytes: ...
+readCourses missing: open does-not-exist.json: ...
+recovered enrollOrPanic: seats must not be negative
+enroll error (no panic): seats must not be negative: -1
+publish panicked: empty title
+published: Go Beginner
 ```
 
 ## Try yourself
 
-1. Call `Reserve` until seats hit 0 and observe the error.
-2. Pass `c` (value) where a pointer is required — read the compiler error.
-3. Sketch `Publish(c *Course) error` that rejects nil / empty title.
+1. Remove `recover` around `enrollOrPanic(-1)` and watch the process crash.
+2. Confirm missing files return an error from `readCourses` — no panic.
+3. Prefer `error` returns for business rules; reserve panic for true programmer bugs.
 
 ## What the next lesson adds
 
-**Lesson 12** — `defer`, `panic`, and `recover` used in the right places.
+**Lesson 13** — beginner lab CLI: `cmd/course-cli` + `internal/course` + JSON file store.
