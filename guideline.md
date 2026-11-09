@@ -1,51 +1,57 @@
-# Lesson 15 — Channels: send and receive between goroutines
+# Lesson 16 — select, buffered channels, and close
 
-Branch: `lesson-15`  
-Article: [Channel trong Golang — gửi nhận dữ liệu giữa goroutine](https://tayjava.com/vi/technologies/channel-trong-golang-gui-nhan-du-lieu-giua-goroutine)
+Branch: `lesson-16`  
+Article: [select, buffered channel và đóng channel trong Golang](https://tayjava.com/vi/technologies/select-buffered-channel-va-dong-channel-trong-golang)
 
 ## Goal of this branch
 
-Share memory by communicating: unbuffered `chan EnrollmentEvent`, directional types (`chan<-` / `<-chan`), producer `close`, consumer `range`, and a `done` signal instead of `Sleep`.
+Use a small buffer for burst sends, `select` among ready cases (including `time.After` timeout), and close channels only from the send owner.
 
-## Changes vs `lesson-14`
+## Changes vs `lesson-15`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/channel-lab/main.go` | Producer → notifier pipeline for enrollment events |
-| `README.md` | Branch table through lesson 15 |
+| `cmd/select-lab/main.go` | Buffered jobs, select timeout, drain-on-close |
+| `README.md` | Branch table through lesson 16 |
 | `guideline.md` | This file |
 
 ## Layout
 
 ```text
 cmd/
-  goroutine-lab/   # lesson 14
-  channel-lab/     # lesson 15 ← new
+  channel-lab/   # lesson 15
+  select-lab/    # lesson 16 ← new
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-15
-go run ./cmd/channel-lab
+git checkout lesson-16
+go run ./cmd/select-lab
 go build ./...
 ```
 
-Expected:
+Expected (shape):
 
 ```text
-notify course=101 email=an@tayjava.com
-notify course=101 email=binh@tayjava.com
-notify course=102 email=chi@tayjava.com
-all done
+--- drain buffered jobs ---
+process course 101
+process course 102
+process course 103
+--- select enroll / cancel / timeout ---
+enrolled an@tayjava.com
+--- select until closed ---
+got course-101
+got course-102
+drained
 ```
 
 ## Try yourself
 
-1. Remove `close(out)` — `range` hangs forever (leak / block).
-2. Drop `<-done` and see `main` exit before all notifies finish.
-3. Sketch who owns the channel close in your design (lesson 16 digs into close rules).
+1. Raise buffer to 3 and send three IDs from `main` before starting a receiver.
+2. Shorten enroll sleep so timeout still loses — or lengthen it to hit `timeout waiting enroll`.
+3. Never double-`close` in real code (panic). Note who owns close: the producer.
 
 ## What the next lesson adds
 
-**Lesson 16** — `select`, buffered channels, and close conventions (`cmd/select-lab`).
+**Lesson 17** — `sync.WaitGroup` and `Mutex` with a seat ledger (`internal/seatledger`).
