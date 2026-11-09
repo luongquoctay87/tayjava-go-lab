@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -18,11 +19,20 @@ type Job struct {
 	CourseID       int64
 }
 
-// ErrQueueFull is returned when the bounded channel cannot accept more work.
-var ErrQueueFull = errors.New("enrollment queue full")
+var (
+	// ErrQueueFull means the bounded channel cannot accept more work.
+	ErrQueueFull = errors.New("queue full")
+	// ErrShuttingDown means Close has stopped new enqueues.
+	ErrShuttingDown = errors.New("shutting down")
+	// ErrDuplicate means this user already submitted the same idempotency key.
+	ErrDuplicate = errors.New("duplicate idempotency key")
+)
 
 // Enroller accepts jobs into a bounded channel and runs workers.
 type Enroller struct {
+	mu      sync.Mutex
+	closed  bool
+	seen    map[string]struct{} // accepted userID:key
 	jobs    chan Job
 	svc     *course.Service
 	idem    *resilience.IdempotencyStore
@@ -42,6 +52,7 @@ func NewEnroller(svc *course.Service, idem *resilience.IdempotencyStore, m *Metr
 		idem = resilience.NewIdempotencyStore()
 	}
 	return &Enroller{
+		seen:    make(map[string]struct{}),
 		jobs:    make(chan Job, queue),
 		svc:     svc,
 		idem:    idem,
@@ -49,14 +60,30 @@ func NewEnroller(svc *course.Service, idem *resilience.IdempotencyStore, m *Metr
 	}
 }
 
-// Enqueue non-blocking; returns ErrQueueFull when the buffer is saturated.
-func (e *Enroller) Enqueue(ctx context.Context, job Job) error {
+// Enqueue is non-blocking. Duplicate keys are rejected before the send.
+// The lock covers the closed flag and the send so Close cannot race a send on a closed channel.
+func (e *Enroller) Enqueue(job Job) error {
+	k := ""
+	if job.IdempotencyKey != "" {
+		k = strconv.FormatInt(job.UserID, 10) + ":" + job.IdempotencyKey
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return ErrShuttingDown
+	}
+	if k != "" {
+		if _, dup := e.seen[k]; dup {
+			return ErrDuplicate
+		}
+	}
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
 	case e.jobs <- job:
+		if k != "" {
+			e.seen[k] = struct{}{}
+		}
 		e.metrics.Accepted.Add(1)
-		e.metrics.setDepth(len(e.jobs))
 		return nil
 	default:
 		e.metrics.Rejected.Add(1)
@@ -64,7 +91,10 @@ func (e *Enroller) Enqueue(ctx context.Context, job Job) error {
 	}
 }
 
-// Run starts n workers that drain jobs until Close.
+// Depth is the number of jobs still buffered.
+func (e *Enroller) Depth() int { return len(e.jobs) }
+
+// Run starts n workers. Each worker uses its own context inside process, never the signal context.
 func (e *Enroller) Run(workers int) {
 	if workers < 1 {
 		workers = 1
@@ -77,8 +107,7 @@ func (e *Enroller) Run(workers int) {
 
 func (e *Enroller) loop() {
 	defer e.wg.Done()
-	for job := range e.jobs {
-		e.metrics.setDepth(len(e.jobs))
+	for job := range e.jobs { // exits after Close, once the buffer is empty
 		e.process(job)
 	}
 }
@@ -116,11 +145,16 @@ func (e *Enroller) process(job Job) {
 	)
 }
 
-// Close stops enqueue by closing the jobs channel and waits for workers to drain.
+// Close rejects new enqueues, then closes the job channel. Safe to call more than once.
+// It does not wait; the caller bounds Wait with the shutdown deadline.
 func (e *Enroller) Close() {
-	close(e.jobs)
-	e.wg.Wait()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !e.closed {
+		e.closed = true
+		close(e.jobs)
+	}
 }
 
-// Wait blocks until workers exit (after Close).
+// Wait blocks until workers have drained the closed channel.
 func (e *Enroller) Wait() { e.wg.Wait() }

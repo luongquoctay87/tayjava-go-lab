@@ -5,7 +5,7 @@ Article: [Advanced Golang lab: API + enrollment worker + metrics](https://tayjav
 
 ## Goal of this branch
 
-Wire one binary: HTTP validates + enqueues (`202` / `503`) → bounded worker pool → seat write via lesson-38 transactions → backlog metrics. Ordered shutdown: HTTP `Shutdown` → close queue → drain workers.
+Wire one binary: HTTP validates + enqueues (`202`, `409` for a duplicate key, `503` with `Retry-After` when the queue is full) → bounded worker pool → seat write via lesson-38 transactions → backlog metrics on `GET /metrics` (`expvar`). Shutdown order: `srv.Shutdown` (check the error) → `Close` (stop enqueue, then close the job channel) → workers drain with `for range` → `Wait` bounded by the same shutdown deadline. Workers use their own context, not the signal context. A duplicate idempotency key is rejected before enqueue.
 
 ## Changes vs `lesson-38`
 
@@ -13,7 +13,7 @@ Wire one binary: HTTP validates + enqueues (`202` / `503`) → bounded worker po
 |--------------|-----|
 | `internal/enrollment` | Enroller, async handler, metrics, tests |
 | `cmd/api/main.go` | Async `POST /api/enrollments` + worker drain |
-| `GET /metrics` | Advanced enroll counters / queue depth |
+| `GET /metrics` | `expvar` counters and `enroll_queue_depth` |
 | `README.md` / `guideline.md` | This lesson |
 
 `db-ddl.sql` unchanged. Sync nested enroll (`POST /courses/{id}/enrollments`) still exists for Intermediate curls.

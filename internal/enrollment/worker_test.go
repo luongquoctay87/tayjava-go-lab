@@ -2,6 +2,7 @@ package enrollment
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -13,10 +14,10 @@ import (
 func TestEnqueueQueueFull(t *testing.T) {
 	svc := course.NewService(course.NewMemoryRepo())
 	e := NewEnroller(svc, resilience.NewIdempotencyStore(), &Metrics{}, 1)
-	if err := e.Enqueue(context.Background(), Job{CourseID: 1, UserID: 1}); err != nil {
+	if err := e.Enqueue(Job{CourseID: 1, UserID: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.Enqueue(context.Background(), Job{CourseID: 1, UserID: 2}); err != ErrQueueFull {
+	if err := e.Enqueue(Job{CourseID: 1, UserID: 2}); err != ErrQueueFull {
 		t.Fatalf("err=%v want ErrQueueFull", err)
 	}
 }
@@ -36,7 +37,7 @@ func TestWorkerProcessesWithIdempotency(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = e.Enqueue(context.Background(), Job{IdempotencyKey: key, CourseID: 2, UserID: 99})
+			_ = e.Enqueue(Job{IdempotencyKey: key, CourseID: 2, UserID: 99})
 		}()
 	}
 	wg.Wait()
@@ -49,6 +50,7 @@ func TestWorkerProcessesWithIdempotency(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	e.Close()
+	e.Wait()
 
 	if m.Processed.Load() < 1 {
 		t.Fatalf("processed=%d", m.Processed.Load())
@@ -59,5 +61,29 @@ func TestWorkerProcessesWithIdempotency(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("enrollments=%d want 1 (idempotent)", n)
+	}
+}
+
+func TestEnqueueRejectsDuplicateBeforeSend(t *testing.T) {
+	svc := course.NewService(course.NewMemoryRepo())
+	e := NewEnroller(svc, nil, &Metrics{}, 4)
+	job := Job{IdempotencyKey: "abc", CourseID: 1, UserID: 7}
+	if err := e.Enqueue(job); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Enqueue(job); !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("err=%v", err)
+	}
+	if e.Depth() != 1 {
+		t.Fatalf("depth=%d", e.Depth())
+	}
+	otherUser := job
+	otherUser.UserID = 8
+	if err := e.Enqueue(otherUser); err != nil {
+		t.Fatalf("other user: %v", err)
+	}
+	e.Close()
+	if err := e.Enqueue(Job{IdempotencyKey: "new", CourseID: 1, UserID: 7}); !errors.Is(err, ErrShuttingDown) {
+		t.Fatalf("after close err=%v", err)
 	}
 }

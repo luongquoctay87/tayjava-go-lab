@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"expvar"
 	"log"
 	"log/slog"
 	"net/http"
@@ -51,10 +52,15 @@ func main() {
 	advMetrics := &enrollment.Metrics{}
 	enroller := enrollment.NewEnroller(svc, idem, advMetrics, 64)
 	asyncEnroll := enrollment.NewHandler(enroller)
+	expvar.Publish("enroll_accepted_total", expvar.Func(func() any { return advMetrics.Accepted.Load() }))
+	expvar.Publish("enroll_rejected_total", expvar.Func(func() any { return advMetrics.Rejected.Load() }))
+	expvar.Publish("enroll_processed_total", expvar.Func(func() any { return advMetrics.Processed.Load() }))
+	expvar.Publish("enroll_failed_total", expvar.Func(func() any { return advMetrics.Failed.Load() }))
+	expvar.Publish("enroll_queue_depth", expvar.Func(func() any { return enroller.Depth() }))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
-	mux.HandleFunc("GET /metrics", advMetrics.Handler())
+	mux.Handle("GET /metrics", expvar.Handler())
 	mux.HandleFunc("POST /login", auth.LoginHandler)
 	mux.HandleFunc("GET /courses/{id}", courses.Get)
 	mux.HandleFunc("POST /courses", courses.Create)
@@ -96,9 +102,22 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("http shutdown: %v", err)
+		slog.Warn("http shutdown incomplete", "err", err)
 	}
-	enroller.Close() // drain accepted jobs
+	// Stop new enqueues, then close the job channel. Workers drain with for range
+	// on their own context; this deadline bounds how long we wait for them.
+	enroller.Close()
+	drained := make(chan struct{})
+	go func() {
+		enroller.Wait()
+		close(drained)
+	}()
+	select {
+	case <-drained:
+		slog.Info("workers drained")
+	case <-shutdownCtx.Done():
+		slog.Error("shutdown deadline hit, jobs dropped", "jobs_left", enroller.Depth())
+	}
 	pool.Close()
 	log.Println("bye")
 }
