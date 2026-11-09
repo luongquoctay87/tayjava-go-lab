@@ -1,39 +1,48 @@
-# Lesson 6 — Small interfaces and composition
+# Lesson 7 — Slices and maps
 
-Branch: `lesson-06`  
-Article: [Interface nhỏ và composition trong Golang](https://tayjava.com/vi/technologies/interface-nho-va-composition-trong-golang)
+Branch: `lesson-07`  
+Article: [Slice và map trong Golang](https://tayjava.com/vi/technologies/slice-va-map-trong-golang)
 
 ## Goal of this branch
 
-Define a small `CourseStore` interface, implement memory + stub stores, and inject them into `EnrollmentService` without changing the service.
+Build Course lists with slices, index them with maps, and see why a nil map panics on write.
 
-## Changes vs `lesson-05`
+## Changes vs `lesson-06`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/ifacedemo/main.go` | Interface + two store implementations |
+| `cmd/collections/main.go` | Slice/map demos + Course index exercise |
 | `guideline.md` | This file |
 
 ## Run
 
 ```bash
-git checkout lesson-06
-go run ./cmd/ifacedemo
+git checkout lesson-07
+go run ./cmd/collections
 ```
 
-Expected:
+Expected (shape):
 
 ```text
-Golang
-Stub Golang
+3 Golang
+[101 102] 2 8
+nil slice: true empty slice: false
+len: 3 cap: ...
+lookup 2: {ID:2 Title:Java Seats:15} ok=true
+nil map write panicked (expected): assignment to entry in nil map
+fixed map len: 1
+enrolled course: 101
+not enrolled
 ```
+
+(`cap` after `append` may be 3 or larger depending on growth.)
 
 ## Try yourself
 
-1. Call `EnrollTitle` with a missing ID and print the error.
-2. Add a third store (e.g. logging wrapper) without editing `EnrollmentService`.
-3. Embed `CourseStore` into a larger interface that also has `Close()`.
+1. Remove the `recover` in `demoNilMapPanic` and watch the process crash.
+2. Always initialize maps with `make` or a literal before writing.
+3. Compare `var s []Course` vs `s := []Course{}` for JSON / `nil` checks later.
 
 ## What the next lesson adds
 
-**Lesson 7** — slices and maps: add `cmd/collections` with Course indexing by ID.
+**Lesson 8** — packages, modules, and export: extract a real `course` package + `cmd/coursedemo`.
