@@ -1,32 +1,46 @@
-# Lesson 38 — Database transactions and context deadlines
+# Lesson 39 — Advanced lab: API + enrollment worker + metrics
 
-Branch: `lesson-38`  
-Article: [Database transactions and context deadlines in Golang](https://tayjava.com/vi/technologies/database-transactions-and-context-deadlines-in-golang)
+Branch: `lesson-39`  
+Article: [Advanced Golang lab: API + enrollment worker + metrics](https://tayjava.com/vi/technologies/advanced-golang-lab-api-enrollment-worker-metrics)
 
 ## Goal of this branch
 
-Enroll inside one transaction: `SELECT seats … FOR UPDATE`, count enrollments, insert when `count < seats`. Handler uses `context.WithTimeout(3s)`. Column remains **`seats`** (total capacity — not `seats_left`).
+Wire one binary: HTTP validates + enqueues (`202` / `503`) → bounded worker pool → seat write via lesson-38 transactions → backlog metrics. Ordered shutdown: HTTP `Shutdown` → close queue → drain workers.
 
-## Changes vs `lesson-37`
+## Changes vs `lesson-38`
 
 | Add / change | Why |
 |--------------|-----|
-| `PostgresRepo.EnrollTx` | BeginTx + FOR UPDATE + capacity check |
-| `MemoryRepo.EnrollTx` | Mutex stand-in for unit tests |
-| `Service.Enroll` | Delegates to `EnrollTx` |
-| `EnrollmentHandler` | 3s timeout → 504 on deadline |
+| `internal/enrollment` | Enroller, async handler, metrics, tests |
+| `cmd/api/main.go` | Async `POST /api/enrollments` + worker drain |
+| `GET /metrics` | Advanced enroll counters / queue depth |
 | `README.md` / `guideline.md` | This lesson |
 
-`db-ddl.sql` unchanged (still includes optional `idempotency_keys` from lesson 35).
+`db-ddl.sql` unchanged. Sync nested enroll (`POST /courses/{id}/enrollments`) still exists for Intermediate curls.
 
 ## Run
 
 ```bash
-git checkout lesson-38
-go test ./internal/course/... ./internal/api/...
-go build ./...
+git checkout lesson-39
+go test -race ./internal/enrollment/...
+go test ./...
+go build -o bin/api ./cmd/api
+```
+
+Async enroll (JWT required):
+
+```bash
+TOKEN=$(curl -s -d '{"userId":"7","password":"lab"}' -H 'Content-Type: application/json' localhost:8080/login | jq -r .token)
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -d '{"courseId":1,"userId":7}' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Idempotency-Key: abc' \
+  -H 'Content-Type: application/json' \
+  localhost:8080/api/enrollments
+# 202
+curl -s localhost:8080/metrics
 ```
 
 ## What the next lesson adds
 
-**Lesson 39** — Advanced lab: API accept → bounded enrollment worker → metrics + graceful drain.
+**Lesson 40** — package design / `internal` boundaries / short compatibility ADR.

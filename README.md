@@ -97,6 +97,7 @@ docker compose up --build
 | `lesson-36` | 36 | JWT Bearer middleware (`JWT_SECRET`) |
 | `lesson-37` | 37 | gRPC vs REST checklist (light demo) |
 | `lesson-38` | 38 | Enroll transaction + 3s deadline (`seats`) |
+| `lesson-39` | 39 | Advanced: async enroll worker + metrics |
 
 ## Conventions
 

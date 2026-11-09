@@ -18,6 +18,7 @@ import (
 	"github.com/tayjava/go-lab/internal/auth"
 	"github.com/tayjava/go-lab/internal/config"
 	"github.com/tayjava/go-lab/internal/course"
+	"github.com/tayjava/go-lab/internal/enrollment"
 	"github.com/tayjava/go-lab/internal/metrics"
 	"github.com/tayjava/go-lab/internal/notify"
 	"github.com/tayjava/go-lab/internal/resilience"
@@ -38,18 +39,22 @@ func main() {
 	defer db.Close()
 	log.Println("postgres ok")
 
-	// Pool lifetime ≠ signal ctx: drain via Close after HTTP Shutdown.
 	pool := notify.NewPool(context.Background(), 4, 64, notify.FakeSMTP)
 
 	repo := course.NewPostgresRepo(db)
 	svc := course.NewService(repo)
 	counters := &metrics.Counters{}
+	idem := resilience.NewIdempotencyStore()
 	courses := api.NewCourseHandler(svc, cfg.EnrollmentCapDefault)
-	enrollments := api.NewEnrollmentHandler(svc, pool, counters, resilience.NewIdempotencyStore())
+	enrollments := api.NewEnrollmentHandler(svc, pool, counters, idem)
+
+	advMetrics := &enrollment.Metrics{}
+	enroller := enrollment.NewEnroller(svc, idem, advMetrics, 64)
+	asyncEnroll := enrollment.NewHandler(enroller)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
-	mux.HandleFunc("GET /metrics", counters.Handler())
+	mux.HandleFunc("GET /metrics", advMetrics.Handler())
 	mux.HandleFunc("POST /login", auth.LoginHandler)
 	mux.HandleFunc("GET /courses/{id}", courses.Get)
 	mux.HandleFunc("POST /courses", courses.Create)
@@ -57,7 +62,8 @@ func main() {
 	mux.HandleFunc("GET /courses/{id}/enrollments", enrollments.List)
 	mux.HandleFunc("GET /api/courses/{id}", courses.Get)
 	mux.HandleFunc("POST /api/courses", courses.Create)
-	mux.Handle("POST /api/enrollments", auth.Bearer(http.HandlerFunc(enrollments.Create)))
+	// Advanced async enroll (lesson 39) — JWT + 202/503
+	mux.Handle("POST /api/enrollments", auth.Bearer(http.HandlerFunc(asyncEnroll.CreateAsync)))
 
 	var h http.Handler = mux
 	h = api.Recovery(h)
@@ -68,7 +74,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// pprof on localhost only — never expose :6060 publicly in the lab.
+	enroller.Run(4)
+
 	go func() {
 		log.Println("pprof listening on 127.0.0.1:6060")
 		if err := http.ListenAndServe("127.0.0.1:6060", nil); err != nil {
@@ -91,6 +98,7 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("http shutdown: %v", err)
 	}
+	enroller.Close() // drain accepted jobs
 	pool.Close()
 	log.Println("bye")
 }
