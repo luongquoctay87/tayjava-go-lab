@@ -1,55 +1,43 @@
-# Lesson 4 — Functions, multiple return values, and scope
+# Lesson 5 — Structs and methods (value vs pointer receivers)
 
-Branch: `lesson-04`  
-Article: [Hàm, nhiều giá trị trả về và scope trong Golang](https://tayjava.com/vi/technologies/ham-nhieu-gia-tri-tra-ve-va-scope-trong-golang)
+Branch: `lesson-05`  
+Article: [Struct và method — value vs pointer receiver](https://tayjava.com/vi/technologies/struct-va-method-value-vs-pointer-receiver)
 
 ## Goal of this branch
 
-Practice functions, `(T, error)`, pass-by-value, short-variable shadowing, and a first look at `defer`.
+Define a `Course` struct, practice value vs pointer receivers, and see why mutation needs a pointer receiver.
 
-## Changes vs `lesson-03`
+## Changes vs `lesson-04`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/funcdemo/main.go` | Demo helpers + exercise `canEnroll` |
+| `cmd/structdemo/main.go` | `Course` + `Publish` / `Remaining` / `Label` |
 | `guideline.md` | This file |
-
-Previous demos (`cmd/zerodemo`, root `main.go`) remain runnable.
-
-## Layout
-
-```text
-cmd/
-  zerodemo/   # lesson 3
-  funcdemo/   # lesson 4
-```
 
 ## Run
 
 ```bash
-git checkout lesson-04
-go run ./cmd/funcdemo
+git checkout lesson-05
+go run ./cmd/structdemo
 ```
 
 Expected (shape):
 
 ```text
-remaining: 20
-canEnroll(30, 5) => ok=true err=<nil>
-canEnroll(30, 40) => ok=false err=not enough seats
-canEnroll(30, 0) => ok=false err=request must be positive
-seats left after enroll: 25
-after bump (pass by value): 10
-enroll user 7 into course 101
-done
+after value Publish: false
+after pointer Publish: {ID:1 Title:Go Seats:30 Published:true}
+remaining(5): 25
+label: 1:Go
+{Title:Go Seats:1 Published:true}
+Go Lab Go
 ```
 
 ## Try yourself
 
-1. Change `canEnroll` error messages; re-run the three cases.
-2. Add a named-return variant of `enroll` and compare with the explicit returns.
-3. Observe that `bump` does not change the caller’s `n` (value semantics).
+1. Flip `Publish` back to a value receiver and watch `Published` stay `false`.
+2. Call `WithTitle` and confirm the original title is unchanged.
+3. Add an embedded `Timestamps` struct and print a promoted field.
 
 ## What the next lesson adds
 
-**Lesson 5** — structs and methods (value vs pointer receivers): add `cmd/structdemo` with a `Course` type.
+**Lesson 6** — small interfaces and composition: `cmd/ifacedemo` with `CourseStore` + `EnrollmentService`.
