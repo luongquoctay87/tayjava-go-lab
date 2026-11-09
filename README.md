@@ -22,7 +22,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-20   # or lesson-02 … lesson-19
+git checkout lesson-21   # or lesson-02 … lesson-20
 cat guideline.md         # read before you edit
 ```
 
@@ -42,13 +42,13 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Lesson 20 JSON API:
+Lesson 21 layered API:
 
 ```bash
-git checkout lesson-20
-go test ./internal/api ./internal/course
+git checkout lesson-21
+go test ./internal/course ./internal/api
 go run ./cmd/api
-# curl -d '{"title":"Go Context","seats":30}' -H 'Content-Type: application/json' http://localhost:8080/api/courses
+# curl http://localhost:8080/api/courses/1
 ```
 
 ## How to learn with this repo
@@ -85,8 +85,9 @@ go run ./cmd/api
 | `lesson-18` | 18 | context timeout/cancel (`cmd/contextlab`) |
 | `lesson-19` | 19 | net/http Course API (`cmd/api`) |
 | `lesson-20` | 20 | JSON + logging/recovery middleware |
+| `lesson-21` | 21 | Handler → service → memory repository |
 
-Later branches continue the series (handler/service/repo → Postgres). Schema (`db-ddl.sql`) from **lesson 22**.
+Next: Postgres + `db-ddl.sql` from **lesson 22**.
 
 ## Conventions
 
@@ -96,7 +97,7 @@ Later branches continue the series (handler/service/repo → Postgres). Schema (
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Layout (lesson 20)
+## Layout (lesson 21)
 
 ```text
 tayjava-go-lab/
@@ -104,18 +105,20 @@ tayjava-go-lab/
 ├── guideline.md
 ├── go.mod
 ├── main.go
-├── course/
+├── course/                  # early package demos
 ├── internal/
-│   ├── api/               # logging / recovery middleware
-│   ├── course/            # CLI store + JSON handlers
+│   ├── api/                 # HTTP handlers + middleware
+│   ├── course/              # CLI store + service/repository
 │   └── seatledger/
 ├── cmd/
 │   ├── course-cli/
 │   ├── goroutine-lab/ … contextlab/
-│   └── api/               # HTTP server
+│   └── api/
 ├── data/
 └── bin/
 ```
+
+No `db-ddl.sql` on this branch (starts at lesson 22).
 
 `db-ddl.sql` appears from lesson 22.
 
@@ -135,7 +138,7 @@ go test ./internal/api ./internal/course
 go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-20
+git checkout lesson-21
 ```
 
 ## Series & support

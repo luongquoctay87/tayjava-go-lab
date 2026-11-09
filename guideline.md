@@ -1,57 +1,68 @@
-# Lesson 20 — JSON and logging/recovery middleware
+# Lesson 21 — Handler → service → repository
 
-Branch: `lesson-20`  
-Article: [JSON và middleware logging/recovery tự viết trong Golang](https://tayjava.com/vi/technologies/json-va-middleware-loggingrecovery-tu-viet-trong-golang)
+Branch: `lesson-21`  
+Article: [Tổ chức handler → service → repository trong Golang](https://tayjava.com/vi/technologies/to-chuc-handler-service-repository-trong-golang)
 
 ## Goal of this branch
 
-Encode/decode Course JSON, limit request bodies with `MaxBytesReader`, and wrap the mux with recovery (inner) then logging (outer) middleware written in stdlib.
+Split the Course API into thin HTTP handlers, a use-case `Service`, and a small `Repository` interface with an in-memory implementation — ready to swap for Postgres in lesson 22. No `db-ddl.sql` yet.
 
-## Changes vs `lesson-19`
+## Changes vs `lesson-20`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/api/middleware.go` | `Logging`, `Recovery`, `statusWriter` |
-| `internal/api/middleware_test.go` | Panic → 500; logging status smoke test |
-| `internal/course/handler.go` | JSON `CreateCourse` / `GetCourse` / enroll |
-| `cmd/api/main.go` | Wire middleware stack + `POST /api/courses` |
-| `README.md` | Branch table through lesson 20 |
+| `internal/course/repository.go` | `Repository` + `MemoryRepo` |
+| `internal/course/service.go` | `Enroll` / `GetCourse` / `CreateCourse` + domain errors |
+| `internal/course/service_test.go` | Table-driven enroll tests (no HTTP) |
+| `internal/api/course.go` | Course HTTP handlers |
+| `internal/api/enrollment.go` | Enrollment HTTP handlers |
+| `internal/api/handler_test.go` | End-to-end HTTP against memory repo |
+| `cmd/api/main.go` | Explicit constructor wiring |
+| removed `internal/course/handler.go` | HTTP lives under `internal/api` |
+| `README.md` | Branch table through lesson 21 |
 | `guideline.md` | This file |
+
+JSON file CLI (`cmd/course-cli` + `Store`) stays for the beginner lab path.
 
 ## Layout
 
 ```text
 cmd/api/main.go
-internal/api/middleware.go
-internal/course/handler.go
+internal/course/
+  model.go store.go          # CLI JSON
+  repository.go service.go   # API domain layers
+internal/api/
+  middleware.go
+  course.go enrollment.go
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-20
-go test ./internal/api ./internal/course
+git checkout lesson-21
+go test ./internal/course ./internal/api
 go build -o bin/api ./cmd/api
 ./bin/api
 ```
 
-In another terminal (free port `:8080`):
+Seeded memory course: `id=1`, `seats=2`.
 
 ```bash
-curl -i -d '{"title":"Go Context","seats":30}' \
-  -H 'Content-Type: application/json' \
-  http://localhost:8080/api/courses
-curl -i http://localhost:8080/api/courses/101
+curl -i http://localhost:8080/api/courses/1
+curl -i -d '{"courseId":1,"userId":7}' -H 'Content-Type: application/json' \
+  http://localhost:8080/api/enrollments
+curl -i -d '{"courseId":1,"userId":8}' -H 'Content-Type: application/json' \
+  http://localhost:8080/api/enrollments
+curl -i -d '{"courseId":1,"userId":9}' -H 'Content-Type: application/json' \
+  http://localhost:8080/api/enrollments   # expect 409 no seats left
 ```
-
-Watch the server log for `POST /api/courses 201 …`.
 
 ## Try yourself
 
-1. Temporarily `panic("boom")` inside `CreateCourse` — client gets 500; process stays up.
-2. Send a huge body and observe `MaxBytesReader` rejection.
-3. Swap middleware order and compare logged status on panic.
+1. Enroll the same `userId` twice — expect `409 already enrolled`.
+2. Implement a second `Repository` (e.g. map copy) and swap it in `main` — service unchanged.
+3. Keep each handler under ~40 lines; map domain errors only at the HTTP edge.
 
 ## What the next lesson adds
 
-**Lesson 21** — handler → service → repository (in-memory) ready for Postgres.
+**Lesson 22** — Postgres with `database/sql` and the first `db-ddl.sql` schema.
