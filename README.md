@@ -22,22 +22,24 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-02
-cat guideline.md    # read before you edit
-go run .
+git checkout lesson-13   # or lesson-02 … lesson-12
+cat guideline.md         # read before you edit
 ```
 
-Expected (lesson 2):
-
-```text
-Hello, TayJava — Course lab
-```
-
-Build a binary:
+Lesson 2 hello:
 
 ```bash
-go build -o bin/hello .
-./bin/hello
+git checkout lesson-02
+go run .
+# Hello, TayJava — Course lab
+```
+
+Lesson 13 Course CLI:
+
+```bash
+git checkout lesson-13
+go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
+go run ./cmd/course-cli list
 ```
 
 ## How to learn with this repo
@@ -56,8 +58,19 @@ go build -o bin/hello .
 |--------|--------|----------|
 | `master` | — | README, starting point |
 | `lesson-02` | 2 | Module + Hello (`go run` / `go build`) |
+| `lesson-03` | 3 | Variables / zero values (`cmd/zerodemo`) |
+| `lesson-04` | 4 | Functions / multi-return (`cmd/funcdemo`) |
+| `lesson-05` | 5 | Struct + methods (`cmd/structdemo`) |
+| `lesson-06` | 6 | Small interfaces (`cmd/ifacedemo`) |
+| `lesson-07` | 7 | Slice + map (`cmd/collections`) |
+| `lesson-08` | 8 | Package export (`course`, `cmd/coursedemo`) |
+| `lesson-09` | 9 | Errors wrap / Is (`cmd/errdemo`) |
+| `lesson-10` | 10 | Table-driven tests (`course/*_test.go`) |
+| `lesson-11` | 11 | Pointers (`cmd/ptrdemo`) |
+| `lesson-12` | 12 | defer / panic / recover (`cmd/deferdemo`) |
+| `lesson-13` | 13 | Course CLI + JSON (`cmd/course-cli`, `internal/course`) |
 
-Branches `lesson-03` … will follow the series (zero values → … → CLI lab → REST API → worker).
+Later branches continue the series (concurrency → REST API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
 
 ## Conventions
 
@@ -67,29 +80,34 @@ Branches `lesson-03` … will follow the series (zero values → … → CLI lab
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Layout (lesson 2)
+## Layout (lesson 13)
 
 ```text
 tayjava-go-lab/
 ├── README.md
-├── guideline.md      # per-branch
+├── guideline.md           # per-branch
 ├── go.mod
-├── main.go           # lesson 2 entrypoint
-├── .gitignore
-└── bin/              # local build (gitignored)
+├── main.go                # lesson 2 entrypoint (kept)
+├── course/                # lessons 8–11 package demos
+├── internal/course/       # lesson 13 CLI domain
+├── cmd/
+│   ├── zerodemo/ … deferdemo/
+│   └── course-cli/        # beginner lab CLI
+├── data/                  # courses.json (gitignored)
+└── bin/                   # local build (gitignored)
 ```
 
-Later lessons add `cmd/`, `internal/`, … on the same module. `db-ddl.sql` appears from lesson 22.
+`db-ddl.sql` appears from lesson 22.
 
 ## Common commands
 
 ```bash
 go version
 go run .
-go build -o bin/hello .
+go run ./cmd/course-cli list
 go test ./...
 git branch -a
-git checkout lesson-02
+git checkout lesson-13
 ```
 
 ## Series & support
