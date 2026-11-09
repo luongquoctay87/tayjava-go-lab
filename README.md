@@ -22,7 +22,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-17   # or lesson-02 … lesson-16
+git checkout lesson-18   # or lesson-02 … lesson-17
 cat guideline.md         # read before you edit
 ```
 
@@ -42,13 +42,12 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Concurrency demos (14–17):
+Intermediate demos (14–18):
 
 ```bash
-git checkout lesson-17
-go run ./cmd/select-lab
+git checkout lesson-18
 go test -race ./internal/seatledger
-go run ./cmd/synclab
+go run ./cmd/contextlab
 ```
 
 ## How to learn with this repo
@@ -82,8 +81,9 @@ go run ./cmd/synclab
 | `lesson-15` | 15 | Channels (`cmd/channel-lab`) |
 | `lesson-16` | 16 | select / buffered / close (`cmd/select-lab`) |
 | `lesson-17` | 17 | WaitGroup + Mutex (`internal/seatledger`, `cmd/synclab`) |
+| `lesson-18` | 18 | context timeout/cancel (`cmd/contextlab`) |
 
-Later branches continue the series (context → REST API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
+Later branches continue the series (HTTP API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
 
 ## Conventions
 
@@ -93,7 +93,7 @@ Later branches continue the series (context → REST API → worker). Postgres s
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Layout (lesson 17)
+## Layout (lesson 18)
 
 ```text
 tayjava-go-lab/
@@ -104,11 +104,11 @@ tayjava-go-lab/
 ├── course/
 ├── internal/
 │   ├── course/            # CLI JSON store
-│   └── seatledger/        # lesson 17 Mutex ledger
+│   └── seatledger/        # Mutex ledger
 ├── cmd/
 │   ├── course-cli/
-│   ├── goroutine-lab/ … select-lab/
-│   └── synclab/           # lesson 17 demo
+│   ├── goroutine-lab/ … synclab/
+│   └── contextlab/        # lesson 18
 ├── data/
 └── bin/
 ```
@@ -125,10 +125,11 @@ go run ./cmd/goroutine-lab
 go run ./cmd/channel-lab
 go run ./cmd/select-lab
 go run ./cmd/synclab
+go run ./cmd/contextlab
 go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-17
+git checkout lesson-18
 ```
 
 ## Series & support

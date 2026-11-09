@@ -1,60 +1,54 @@
-# Lesson 17 — WaitGroup and Mutex when channels are not enough
+# Lesson 18 — context: timeout, cancel, and call-chain propagation
 
-Branch: `lesson-17`  
-Article: [sync.WaitGroup và Mutex trong Golang — khi channel chưa đủ](https://tayjava.com/vi/technologies/syncwaitgroup-va-mutex-trong-golang-khi-channel-chua-du)
+Branch: `lesson-18`  
+Article: [context.Context trong Golang — timeout, cancel và truyền xuống call chain](https://tayjava.com/vi/technologies/contextcontext-trong-golang-timeout-cancel-va-truyen-xuong-call-chain)
 
 ## Goal of this branch
 
-Join N workers with `WaitGroup`, protect shared seat counts with `Mutex`, and keep `go test -race` clean on concurrent reserves.
+Create contexts with `WithTimeout` / `WithCancel`, always `defer cancel()`, pass `ctx` through Enroll → checkSeat → saveEnrollment, and carry a request ID via `WithValue` (not a DB handle).
 
-## Changes vs `lesson-16`
+## Changes vs `lesson-17`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/seatledger/` | Mutex-backed `SeatLedger` + race-friendly tests |
-| `cmd/synclab/main.go` | WaitGroup notify + concurrent reserve demo |
-| `README.md` | Branch table through lesson 17 |
+| `cmd/contextlab/main.go` | Timeout, cancel, and Enroll chain demos |
+| `README.md` | Branch table through lesson 18 |
 | `guideline.md` | This file |
-
-Note: the lesson-13 Course CLI is single-threaded — it does not need a Mutex yet.
 
 ## Layout
 
 ```text
-internal/seatledger/
-  ledger.go
-  ledger_test.go
-cmd/synclab/
+cmd/contextlab/main.go
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-17
-go test -race ./internal/seatledger
-go run ./cmd/synclab
+git checkout lesson-18
+go run ./cmd/contextlab
 go build ./...
 ```
 
-Expected test: pass with race detector clean.
-
-Expected `synclab` (reserve lines may reorder):
+Expected (shape):
 
 ```text
---- WaitGroup notify ---
-sent: ...
-all emails sent
---- Mutex seat ledger ---
-reserved true|false (exactly two true)
-left 0
+--- timeout too short (expect deadline) ---
+failed: context deadline exceeded
+--- enroll with request ID (expect success) ---
+enrolled user=7 course=101 requestID=req-42
+enroll ok
+--- enroll deadline (80ms+80ms > 100ms) ---
+enroll failed: context deadline exceeded
+--- manual cancel ---
+result:  context canceled
 ```
 
 ## Try yourself
 
-1. Temporarily comment `Lock`/`Unlock` in `Reserve`, run `go test -race` — expect a WARNING, then restore.
-2. Forget one `Done` and watch `Wait` hang.
-3. Confirm CLI Course CRUD still needs no Mutex (one goroutine).
+1. Raise the first timeout above 800ms — `loadCourse` succeeds.
+2. Omit `defer cancel()` once while reading docs — then put it back (timer leak habit).
+3. Never create `context.Background()` inside `saveEnrollment`.
 
 ## What the next lesson adds
 
-**Lesson 18** — `context` timeout/cancel through a fake Enroll call chain.
+**Lesson 19** — `net/http` Course API skeleton (`cmd/api`).
