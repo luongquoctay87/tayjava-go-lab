@@ -143,11 +143,17 @@ func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, course
 			"user_id", userID,
 			"err", err.Error(),
 		)
-		if errors.Is(err, context.DeadlineExceeded) {
-			WriteError(w, http.StatusGatewayTimeout, "TIMEOUT", "enroll deadline exceeded")
-			return
+		switch {
+		case errors.Is(err, course.ErrNoSeats), errors.Is(err, course.ErrConflict), errors.Is(err, course.ErrNotFound):
+			MapDomainError(w, err)
+		case errors.Is(ctx.Err(), context.DeadlineExceeded):
+			// A deadline that lands on Commit often surfaces as sql.ErrTxDone.
+			// ctx.Err() is the stable signal for a 503 the client may retry.
+			w.Header().Set("Retry-After", "1")
+			WriteError(w, http.StatusServiceUnavailable, "TIMEOUT", "timeout")
+		default:
+			MapDomainError(w, err)
 		}
-		MapDomainError(w, err)
 		return
 	}
 	h.observe(true, time.Since(start))
