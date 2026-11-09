@@ -23,7 +23,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-25   # or lesson-02 … lesson-24
+git checkout lesson-26   # or lesson-02 … lesson-25
 cat guideline.md         # read before you edit
 ```
 
@@ -43,14 +43,12 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Lesson 25 config + Postgres:
+Lesson 26 Docker image:
 
 ```bash
-git checkout lesson-25
-export DATABASE_URL='postgres://tayjava:tayjava@localhost:5432/tayjava?sslmode=disable'
-# psql "$DATABASE_URL" -f db-ddl.sql
-go test ./internal/config ./internal/api ./internal/course
-go run ./cmd/api
+git checkout lesson-26
+go test ./...
+docker build -t tayjava/course-api:dev .
 ```
 
 ## How to learn with this repo
@@ -92,8 +90,9 @@ go run ./cmd/api
 | `lesson-23` | 23 | Validation + centralized HTTP errors |
 | `lesson-24` | 24 | httptest table-driven HTTP tests |
 | `lesson-25` | 25 | Env config / twelve-factor light |
+| `lesson-26` | 26 | Docker multi-stage Course API image |
 
-Later branches continue Docker and the Intermediate lab.
+Next: Intermediate lab (**lesson 27**).
 
 ## Conventions
 
@@ -103,12 +102,14 @@ Later branches continue Docker and the Intermediate lab.
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: present from **`lesson-22` onward**. Apply with `psql "$DATABASE_URL" -f db-ddl.sql`. Capacity column is **`seats`** (not `seats_left`).
 
-## Layout (lesson 25)
+## Layout (lesson 26)
 
 ```text
 tayjava-go-lab/
 ├── README.md
 ├── guideline.md
+├── Dockerfile
+├── .dockerignore
 ├── .env.example
 ├── db-ddl.sql               # courses + enrollments (seats)
 ├── go.mod
@@ -116,14 +117,10 @@ tayjava-go-lab/
 ├── course/
 ├── internal/
 │   ├── api/
-│   ├── config/              # env Config
+│   ├── config/
 │   ├── course/
 │   └── seatledger/
-├── cmd/
-│   ├── course-cli/
-│   ├── goroutine-lab/ … contextlab/
-│   └── api/
-├── data/
+├── cmd/ …
 └── bin/
 ```
 
@@ -143,8 +140,9 @@ go test ./internal/api ./internal/course ./internal/config
 go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-25
+git checkout lesson-26
 # psql "$DATABASE_URL" -f db-ddl.sql
+# docker build -t tayjava/course-api:dev .
 ```
 
 ## Series & support

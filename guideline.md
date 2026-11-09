@@ -1,68 +1,63 @@
-# Lesson 25 — Env config / twelve-factor light
+# Lesson 26 — Docker multi-stage Go binary
 
-Branch: `lesson-25`  
-Article: [Config bằng env và twelve-factor nhẹ trong Golang](https://tayjava.com/vi/technologies/config-bang-env-va-twelve-factor-nhe-trong-golang)
+Branch: `lesson-26`  
+Article: [Docker multi-stage: build binary Golang nhỏ](https://tayjava.com/vi/technologies/docker-multi-stage-build-binary-golang-nho)
 
 ## Goal of this branch
 
-Load a `Config` struct from the environment (`HTTP_ADDR`, `DATABASE_URL`, `ENROLLMENT_CAP_DEFAULT`, `SHUTDOWN_TIMEOUT`), fail fast when required vars are missing, and keep secrets out of Git via `.env.example` + gitignored `.env`.
+Ship a multi-stage `Dockerfile`: builder compiles `./cmd/api` with `CGO_ENABLED=0`, runtime Distroless image only carries the binary. Layer-cache `go.mod` / `go.sum` before source. Inject runtime config via env (lesson 25).
 
-## Changes vs `lesson-24`
+## Changes vs `lesson-25`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/config/` | `Load()` + unit tests |
-| `cmd/api/main.go` | Wire config; Postgres required |
-| `internal/api/course.go` | Default seats from `ENROLLMENT_CAP_DEFAULT` when body sends `0` |
-| `.env.example` | Safe template (no real secrets) |
-| `.gitignore` | Ignore `.env` |
+| `Dockerfile` | Multi-stage builder → distroless/static |
+| `.dockerignore` | Keep context small (no `.git`, `bin/`, tests, `.env`) |
 | `README.md` / `guideline.md` | This lesson |
 
-`db-ddl.sql` unchanged — still apply with `psql "$DATABASE_URL" -f db-ddl.sql`. Column remains **`seats`**.
+`db-ddl.sql` stays in the image context if you need it on the host; apply schema from the host or a migrate step:
 
-## Env vars
+```bash
+psql "$DATABASE_URL" -f db-ddl.sql
+```
 
-| Variable | Required | Default |
-|----------|----------|---------|
-| `DATABASE_URL` | yes | — |
-| `HTTP_ADDR` | no | `:8080` |
-| `ENROLLMENT_CAP_DEFAULT` | no | `30` |
-| `SHUTDOWN_TIMEOUT` | no | `10s` |
-
-Do not log the full `DATABASE_URL` (password lives in the URL).
+Capacity column remains **`seats`**.
 
 ## Layout
 
 ```text
+Dockerfile
+.dockerignore
 .env.example
 db-ddl.sql
-internal/config/config.go
 cmd/api/main.go
+internal/config/
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-25
-go test ./internal/config ./internal/api ./internal/course
+git checkout lesson-26
+go test ./...
 go build -o bin/api ./cmd/api
 
-export DATABASE_URL='postgres://tayjava:tayjava@localhost:5432/tayjava?sslmode=disable'
-export HTTP_ADDR=':8081'
-psql "$DATABASE_URL" -f db-ddl.sql
-./bin/api
+docker build -t tayjava/course-api:dev .
+docker run --rm -p 8080:8080 \
+  -e HTTP_ADDR=:8080 \
+  -e DATABASE_URL='postgres://tayjava:tayjava@host.docker.internal:5432/tayjava?sslmode=disable' \
+  tayjava/course-api:dev
 ```
 
-Without `DATABASE_URL`, the process exits immediately with a clear error (expected).
+On Linux you may need `--add-host=host.docker.internal:host-gateway`. Hit `GET /healthz` after Postgres is reachable.
 
-HTTP tests and `go build ./...` do not need a live database.
+`go build ./...` and unit tests do not require Docker or a live database.
 
 ## Try yourself
 
-1. Unset `DATABASE_URL` and confirm fail-fast.
-2. Set `ENROLLMENT_CAP_DEFAULT=50` and `POST` a course with `"seats":0` — response seats should be 50.
-3. Copy `.env.example` → `.env` locally; keep `.env` untracked.
+1. Compare image size: single-stage `golang` vs this multi-stage tag.
+2. Omit `DATABASE_URL` — container should exit with the lesson-25 fail-fast message.
+3. Confirm `HTTP_ADDR` listens on `:8080` (all interfaces), not `127.0.0.1`.
 
 ## What the next lesson adds
 
-**Lesson 26** — multi-stage Dockerfile for a small Go API image.
+**Lesson 27** — Intermediate lab: compose Course REST + enrollment + Docker Compose end-to-end.
