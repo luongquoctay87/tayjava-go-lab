@@ -45,24 +45,9 @@ func (s *Service) CreateCourse(ctx context.Context, c Course) (Course, error) {
 }
 
 // Enroll registers userID on courseID when capacity (seats) remains.
-// seats is total capacity; enrollments are counted separately (not seats_left).
+// Uses a single repository transaction (FOR UPDATE + count < seats + insert).
 func (s *Service) Enroll(ctx context.Context, courseID, userID int64) (Enrollment, error) {
-	c, err := s.repo.Get(ctx, courseID)
-	if err != nil {
-		return Enrollment{}, err
-	}
-	n, err := s.repo.CountEnrollments(ctx, courseID)
-	if err != nil {
-		return Enrollment{}, err
-	}
-	if n >= c.Seats {
-		return Enrollment{}, ErrNoSeats
-	}
-	en, err := s.repo.InsertEnrollment(ctx, courseID, userID)
-	if err != nil {
-		return Enrollment{}, err
-	}
-	return en, nil
+	return s.repo.EnrollTx(ctx, courseID, userID)
 }
 
 // ListEnrollments returns enrollments for a course (404 if course missing).

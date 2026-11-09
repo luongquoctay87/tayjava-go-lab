@@ -1,33 +1,32 @@
-# Lesson 37 — gRPC and protobuf (light demo)
+# Lesson 38 — Database transactions and context deadlines
 
-Branch: `lesson-37`  
-Article: [gRPC and protobuf in Golang — when to replace REST](https://tayjava.com/vi/technologies/grpc-and-protobuf-in-golang-when-to-replace-rest)
+Branch: `lesson-38`  
+Article: [Database transactions and context deadlines in Golang](https://tayjava.com/vi/technologies/database-transactions-and-context-deadlines-in-golang)
 
 ## Goal of this branch
 
-Capture when gRPC pays off for internal services. This branch is a **light demo** (no `protoc` / generated stubs) so the lab stays runnable without the protobuf toolchain.
+Enroll inside one transaction: `SELECT seats … FOR UPDATE`, count enrollments, insert when `count < seats`. Handler uses `context.WithTimeout(3s)`. Column remains **`seats`** (total capacity — not `seats_left`).
 
-## Changes vs `lesson-36`
+## Changes vs `lesson-37`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/grpcdemo` | Checklist demo: REST public / gRPC internal |
+| `PostgresRepo.EnrollTx` | BeginTx + FOR UPDATE + capacity check |
+| `MemoryRepo.EnrollTx` | Mutex stand-in for unit tests |
+| `Service.Enroll` | Delegates to `EnrollTx` |
+| `EnrollmentHandler` | 3s timeout → 504 on deadline |
 | `README.md` / `guideline.md` | This lesson |
 
-`db-ddl.sql` unchanged. JWT enroll routes remain REST.
+`db-ddl.sql` unchanged (still includes optional `idempotency_keys` from lesson 35).
 
 ## Run
 
 ```bash
-git checkout lesson-37
-go run ./cmd/grpcdemo
+git checkout lesson-38
+go test ./internal/course/... ./internal/api/...
 go build ./...
 ```
 
-## Why not full protobuf here
-
-Generating `.pb.go` needs `protoc` + plugins on every learner machine. The article covers contracts; the Advanced lab (39) stays on HTTP + in-process workers.
-
 ## What the next lesson adds
 
-**Lesson 38** — enroll inside a DB transaction with `context.WithTimeout`; keep **`seats`** as total capacity.
+**Lesson 39** — Advanced lab: API accept → bounded enrollment worker → metrics + graceful drain.

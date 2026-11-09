@@ -13,6 +13,8 @@ type Repository interface {
 	CountEnrollments(ctx context.Context, courseID int64) (int, error)
 	InsertEnrollment(ctx context.Context, courseID, userID int64) (Enrollment, error)
 	ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error)
+	// EnrollTx reserves a seat under a transaction: lock course, check count < seats, insert.
+	EnrollTx(ctx context.Context, courseID, userID int64) (Enrollment, error)
 }
 
 // MemoryRepo is an in-process Course + Enrollment store for unit tests.
@@ -93,6 +95,33 @@ func (m *MemoryRepo) InsertEnrollment(ctx context.Context, courseID, userID int6
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.insertEnrollmentLocked(courseID, userID)
+}
+
+// EnrollTx performs capacity check + insert under the memory mutex (lab stand-in for a DB tx).
+func (m *MemoryRepo) EnrollTx(ctx context.Context, courseID, userID int64) (Enrollment, error) {
+	if err := ctx.Err(); err != nil {
+		return Enrollment{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.data[courseID]
+	if !ok {
+		return Enrollment{}, ErrNotFound
+	}
+	n := 0
+	for _, e := range m.enrollments {
+		if e.CourseID == courseID {
+			n++
+		}
+	}
+	if n >= c.Seats {
+		return Enrollment{}, ErrNoSeats
+	}
+	return m.insertEnrollmentLocked(courseID, userID)
+}
+
+func (m *MemoryRepo) insertEnrollmentLocked(courseID, userID int64) (Enrollment, error) {
 	key := fmt.Sprintf("%d:%d", courseID, userID)
 	for _, e := range m.enrollments {
 		if fmt.Sprintf("%d:%d", e.CourseID, e.UserID) == key {

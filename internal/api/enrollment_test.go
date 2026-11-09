@@ -62,6 +62,22 @@ func (s stubRepo) InsertEnrollment(ctx context.Context, courseID, userID int64) 
 	return course.Enrollment{ID: 1, CourseID: courseID, UserID: userID}, nil
 }
 
+func (s stubRepo) EnrollTx(ctx context.Context, courseID, userID int64) (course.Enrollment, error) {
+	if err := ctx.Err(); err != nil {
+		return course.Enrollment{}, err
+	}
+	if s.err != nil {
+		return course.Enrollment{}, s.err
+	}
+	if s.course.ID != 0 && courseID != s.course.ID {
+		return course.Enrollment{}, course.ErrNotFound
+	}
+	if s.enrollCount >= s.course.Seats {
+		return course.Enrollment{}, course.ErrNoSeats
+	}
+	return s.InsertEnrollment(ctx, courseID, userID)
+}
+
 func (s stubRepo) ListEnrollments(ctx context.Context, courseID int64) ([]course.Enrollment, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

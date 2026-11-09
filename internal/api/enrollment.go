@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
-
 	"time"
 
 	"github.com/tayjava/go-lab/internal/course"
@@ -130,8 +130,11 @@ func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, course
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
 	start := time.Now()
-	en, err := h.svc.Enroll(r.Context(), courseID, userID)
+	en, err := h.svc.Enroll(ctx, courseID, userID)
 	if err != nil {
 		h.observe(false, time.Since(start))
 		slog.Error("enroll_failed",
@@ -140,6 +143,10 @@ func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, course
 			"user_id", userID,
 			"err", err.Error(),
 		)
+		if errors.Is(err, context.DeadlineExceeded) {
+			WriteError(w, http.StatusGatewayTimeout, "TIMEOUT", "enroll deadline exceeded")
+			return
+		}
 		MapDomainError(w, err)
 		return
 	}

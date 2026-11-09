@@ -80,6 +80,51 @@ RETURNING id, course_id, user_id`
 	return e, nil
 }
 
+// EnrollTx locks the course row (FOR UPDATE), checks count < seats, then inserts.
+// seats is total capacity — we never decrement a seats_left column.
+func (p *PostgresRepo) EnrollTx(ctx context.Context, courseID, userID int64) (Enrollment, error) {
+	tx, err := p.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Enrollment{}, err
+	}
+	defer tx.Rollback()
+
+	var seats int
+	err = tx.QueryRowContext(ctx,
+		`SELECT seats FROM courses WHERE id = $1 FOR UPDATE`, courseID).Scan(&seats)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Enrollment{}, ErrNotFound
+	}
+	if err != nil {
+		return Enrollment{}, err
+	}
+
+	var n int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM enrollments WHERE course_id = $1`, courseID).Scan(&n); err != nil {
+		return Enrollment{}, err
+	}
+	if n >= seats {
+		return Enrollment{}, ErrNoSeats
+	}
+
+	var e Enrollment
+	err = tx.QueryRowContext(ctx, `
+INSERT INTO enrollments (course_id, user_id) VALUES ($1, $2)
+RETURNING id, course_id, user_id`, courseID, userID).Scan(&e.ID, &e.CourseID, &e.UserID)
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return Enrollment{}, ErrConflict
+		}
+		return Enrollment{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Enrollment{}, err
+	}
+	return e, nil
+}
+
 // ListEnrollments returns enrollments for a course ordered by id.
 func (p *PostgresRepo) ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error) {
 	const q = `SELECT id, course_id, user_id FROM enrollments WHERE course_id = $1 ORDER BY id`

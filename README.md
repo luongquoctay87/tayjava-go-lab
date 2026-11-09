@@ -96,6 +96,7 @@ docker compose up --build
 | `lesson-35` | 35 | Retry/backoff + Idempotency-Key |
 | `lesson-36` | 36 | JWT Bearer middleware (`JWT_SECRET`) |
 | `lesson-37` | 37 | gRPC vs REST checklist (light demo) |
+| `lesson-38` | 38 | Enroll transaction + 3s deadline (`seats`) |
 
 ## Conventions
 
