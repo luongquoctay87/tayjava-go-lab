@@ -1,89 +1,78 @@
-# Lesson 22 — Postgres with database/sql + db-ddl.sql
+# Lesson 23 — Validation and centralized HTTP errors
 
-Branch: `lesson-22`  
-Article: [Postgres với database/sql trong Golang — và migration cơ bản](https://tayjava.com/vi/technologies/postgres-voi-databasesql-trong-golang-va-migration-co-ban)
+Branch: `lesson-23`  
+Article: [Validation và xử lý lỗi HTTP tập trung trong Golang](https://tayjava.com/vi/technologies/validation-va-xu-ly-loi-http-tap-trung-trong-golang)
 
 ## Goal of this branch
 
-Open a `*sql.DB` pool with `PingContext`, implement `PostgresRepo` for Course CRUD, and introduce the shared Postgres schema file `db-ddl.sql`. Capacity column is **`seats`** (not `seats_left`).
+Validate JSON at the HTTP edge (`DisallowUnknownFields` + simple rules) and map every domain error through one `ErrorBody` / `WriteError` / `MapDomainError` helper. Service still returns domain errors — never HTTP status codes.
 
-## Changes vs `lesson-21`
+## Changes vs `lesson-22`
 
 | Add / change | Why |
 |--------------|-----|
-| `db-ddl.sql` | `courses` + `enrollments` schema (kept from this lesson onward) |
-| `internal/course/postgres.go` | `OpenDB`, `PostgresRepo.Get` / `Save` |
-| `cmd/api/main.go` | Wire Postgres when `DATABASE_URL` is set |
-| `go.mod` / `go.sum` | `github.com/lib/pq` driver |
-| `README.md` | Branch table through lesson 22 |
+| `internal/api/errors.go` | `ErrorBody`, `WriteJSON`, `WriteError`, `MapDomainError` |
+| `internal/api/course.go` | Decode/validate + shared error helpers |
+| `internal/api/enrollment.go` | Decode/validate enroll body |
+| `internal/api/handler_test.go` | Assert `VALIDATION` / `NO_SEATS` codes |
+| `README.md` | Branch table through lesson 23 |
 | `guideline.md` | This file |
 
-Service and HTTP handlers stay the same — only the repository implementation changes.
+`db-ddl.sql` is unchanged (`seats` column kept).
 
-## Schema notes
+## Error contract
 
-- `courses.seats` = available capacity (`CHECK (seats >= 0)`).
-- Optional forward-compat columns: `level`, `created_at` (CLI / later labs).
-- `enrollments`: FK to `courses`, `UNIQUE (course_id, user_id)`.
-
-Apply DDL:
-
-```bash
-psql "$DATABASE_URL" -f db-ddl.sql
+```json
+{"code":"NO_SEATS","message":"no seats left"}
 ```
 
-Example DSN:
-
-```text
-postgres://tayjava:tayjava@localhost:5432/tayjava?sslmode=disable
-```
+| Kind | Example | Status / code |
+|------|---------|----------------|
+| Input | `courseId: 0`, bad JSON | 400 `VALIDATION` |
+| Business | no seats / already enrolled | 409 `NO_SEATS` / `CONFLICT` |
+| Missing | unknown course | 404 `NOT_FOUND` |
+| System | unexpected | 500 `INTERNAL` (log detail server-side) |
 
 ## Layout
 
 ```text
 db-ddl.sql
-cmd/api/main.go
-internal/course/postgres.go   # OpenDB + PostgresRepo
-internal/course/repository.go # MemoryRepo still available
+internal/api/errors.go
+internal/api/course.go
+internal/api/enrollment.go
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-22
-go test ./internal/course ./internal/api
+git checkout lesson-23
+go test ./internal/api ./internal/course
 go build -o bin/api ./cmd/api
-```
-
-Without Postgres (memory fallback):
-
-```bash
 ./bin/api
 ```
 
-With Postgres:
+```bash
+curl -i -d '{"courseId":0,"userId":7}' -H 'Content-Type: application/json' \
+  http://localhost:8080/api/enrollments
+# 400 VALIDATION
+
+curl -i -d '{"courseId":1,"userId":7}' -H 'Content-Type: application/json' \
+  http://localhost:8080/api/enrollments
+# enroll until seats=0 → 409 NO_SEATS
+```
+
+Apply schema when using Postgres:
 
 ```bash
-export DATABASE_URL='postgres://tayjava:tayjava@localhost:5432/tayjava?sslmode=disable'
 psql "$DATABASE_URL" -f db-ddl.sql
-./bin/api
 ```
-
-```bash
-curl -i -d '{"title":"Go Context","seats":30,"level":"intermediate"}' \
-  -H 'Content-Type: application/json' \
-  http://localhost:8080/api/courses
-curl -i http://localhost:8080/api/courses/1
-```
-
-Restart the API — rows remain when using Postgres (unlike MemoryRepo).
 
 ## Try yourself
 
-1. Confirm `$1` placeholders in `PostgresRepo` — never concatenate user input into SQL.
-2. Drop `courses` and restart without re-applying DDL — expect a clear SQL error.
-3. Swap back to `NewMemoryRepo()` in `main` and note data disappears after restart.
+1. Send unknown JSON field (`course_id`) — expect `VALIDATION` / invalid json.
+2. Force a non-domain error path and confirm the client only sees `INTERNAL`.
+3. Keep service free of `net/http` imports.
 
 ## What the next lesson adds
 
-**Lesson 23** — validation at the HTTP edge and centralized `MapDomainError` JSON errors.
+**Lesson 24** — lock the error contract with table-driven `httptest` tests.

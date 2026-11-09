@@ -53,7 +53,7 @@ func TestAPILayers(t *testing.T) {
 		req1 := httptest.NewRequest(http.MethodPost, "/api/enrollments", strings.NewReader(body1))
 		h.ServeHTTP(rr1, req1)
 		if rr1.Code != http.StatusCreated {
-			t.Fatalf("first enroll status %d", rr1.Code)
+			t.Fatalf("first enroll status %d body=%s", rr1.Code, rr1.Body.String())
 		}
 
 		body2 := `{"courseId":1,"userId":8}`
@@ -71,6 +71,30 @@ func TestAPILayers(t *testing.T) {
 		if rr3.Code != http.StatusConflict {
 			t.Fatalf("third enroll status %d want 409", rr3.Code)
 		}
+		var eb api.ErrorBody
+		if err := json.Unmarshal(rr3.Body.Bytes(), &eb); err != nil {
+			t.Fatal(err)
+		}
+		if eb.Code != "NO_SEATS" {
+			t.Fatalf("code=%q want NO_SEATS", eb.Code)
+		}
+	})
+
+	t.Run("validation courseId zero", func(t *testing.T) {
+		body := `{"courseId":0,"userId":7}`
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/enrollments", strings.NewReader(body))
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status %d want 400", rr.Code)
+		}
+		var eb api.ErrorBody
+		if err := json.Unmarshal(rr.Body.Bytes(), &eb); err != nil {
+			t.Fatal(err)
+		}
+		if eb.Code != "VALIDATION" {
+			t.Fatalf("code=%q want VALIDATION", eb.Code)
+		}
 	})
 
 	t.Run("create course", func(t *testing.T) {
@@ -79,7 +103,7 @@ func TestAPILayers(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/courses", strings.NewReader(body))
 		h.ServeHTTP(rr, req)
 		if rr.Code != http.StatusCreated {
-			t.Fatalf("status %d", rr.Code)
+			t.Fatalf("status %d body=%s", rr.Code, rr.Body.String())
 		}
 		var c course.Course
 		if err := json.NewDecoder(rr.Body).Decode(&c); err != nil {
