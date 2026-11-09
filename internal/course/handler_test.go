@@ -1,12 +1,14 @@
 package course_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/tayjava/go-lab/internal/api"
 	"github.com/tayjava/go-lab/internal/course"
 )
 
@@ -14,30 +16,72 @@ func TestHTTPRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", course.Healthz)
 	mux.HandleFunc("GET /api/courses/{id}", course.GetCourse)
+	mux.HandleFunc("POST /api/courses", course.CreateCourse)
 	mux.HandleFunc("POST /api/enrollments", course.CreateEnrollment)
 
-	tests := []struct {
-		method string
-		path   string
-		want   int
-		body   string
-	}{
-		{"GET", "/healthz", http.StatusOK, "ok"},
-		{"GET", "/api/courses/101", http.StatusOK, "course id=101"},
-		{"POST", "/api/enrollments?courseId=101&userId=7", http.StatusCreated, "enrolled user=7 course=101"},
-		{"GET", "/api/enrollments", http.StatusMethodNotAllowed, ""},
-	}
+	var h http.Handler = mux
+	h = api.Recovery(h)
+	h = api.Logging(h)
 
-	for _, tt := range tests {
-		req := httptest.NewRequest(tt.method, tt.path, nil)
+	t.Run("healthz", func(t *testing.T) {
 		rr := httptest.NewRecorder()
-		mux.ServeHTTP(rr, req)
-		if rr.Code != tt.want {
-			t.Fatalf("%s %s: status got %d want %d", tt.method, tt.path, rr.Code, tt.want)
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+		if rr.Code != http.StatusOK || string(mustRead(rr)) != "ok" {
+			t.Fatalf("healthz: %d %q", rr.Code, mustRead(rr))
 		}
-		got, _ := io.ReadAll(rr.Body)
-		if tt.body != "" && !strings.Contains(string(got), tt.body) {
-			t.Fatalf("%s %s: body %q missing %q", tt.method, tt.path, got, tt.body)
+	})
+
+	t.Run("get course json", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/courses/101", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status %d", rr.Code)
 		}
-	}
+		var c course.Course
+		if err := json.NewDecoder(rr.Body).Decode(&c); err != nil {
+			t.Fatal(err)
+		}
+		if c.ID != 101 || c.Title == "" {
+			t.Fatalf("course %+v", c)
+		}
+	})
+
+	t.Run("create course json", func(t *testing.T) {
+		body := `{"title":"Go Context","seats":30,"level":"intermediate"}`
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/courses", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("status %d body %s", rr.Code, mustRead(rr))
+		}
+		var c course.Course
+		if err := json.NewDecoder(rr.Body).Decode(&c); err != nil {
+			t.Fatal(err)
+		}
+		if c.ID != 101 || c.Title != "Go Context" || c.Seats != 30 {
+			t.Fatalf("created %+v", c)
+		}
+	})
+
+	t.Run("enroll", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/enrollments?courseId=101&userId=7", nil))
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("status %d", rr.Code)
+		}
+	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/enrollments", nil))
+		if rr.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status %d want 405", rr.Code)
+		}
+	})
+}
+
+func mustRead(rr *httptest.ResponseRecorder) []byte {
+	b, _ := io.ReadAll(rr.Body)
+	return b
 }

@@ -22,7 +22,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-19   # or lesson-02 … lesson-18
+git checkout lesson-20   # or lesson-02 … lesson-19
 cat guideline.md         # read before you edit
 ```
 
@@ -42,12 +42,13 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Lesson 19 API skeleton:
+Lesson 20 JSON API:
 
 ```bash
-git checkout lesson-19
+git checkout lesson-20
+go test ./internal/api ./internal/course
 go run ./cmd/api
-# curl http://localhost:8080/healthz
+# curl -d '{"title":"Go Context","seats":30}' -H 'Content-Type: application/json' http://localhost:8080/api/courses
 ```
 
 ## How to learn with this repo
@@ -83,8 +84,9 @@ go run ./cmd/api
 | `lesson-17` | 17 | WaitGroup + Mutex (`internal/seatledger`, `cmd/synclab`) |
 | `lesson-18` | 18 | context timeout/cancel (`cmd/contextlab`) |
 | `lesson-19` | 19 | net/http Course API (`cmd/api`) |
+| `lesson-20` | 20 | JSON + logging/recovery middleware |
 
-Later branches continue the series (JSON/middleware → layers → Postgres). Schema (`db-ddl.sql`) from **lesson 22**.
+Later branches continue the series (handler/service/repo → Postgres). Schema (`db-ddl.sql`) from **lesson 22**.
 
 ## Conventions
 
@@ -94,7 +96,7 @@ Later branches continue the series (JSON/middleware → layers → Postgres). Sc
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Layout (lesson 19)
+## Layout (lesson 20)
 
 ```text
 tayjava-go-lab/
@@ -104,12 +106,13 @@ tayjava-go-lab/
 ├── main.go
 ├── course/
 ├── internal/
-│   ├── course/            # CLI store + HTTP handlers
+│   ├── api/               # logging / recovery middleware
+│   ├── course/            # CLI store + JSON handlers
 │   └── seatledger/
 ├── cmd/
 │   ├── course-cli/
 │   ├── goroutine-lab/ … contextlab/
-│   └── api/               # lesson 19 HTTP server
+│   └── api/               # HTTP server
 ├── data/
 └── bin/
 ```
@@ -128,10 +131,11 @@ go run ./cmd/select-lab
 go run ./cmd/synclab
 go run ./cmd/contextlab
 go run ./cmd/api
+go test ./internal/api ./internal/course
 go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-19
+git checkout lesson-20
 ```
 
 ## Series & support
