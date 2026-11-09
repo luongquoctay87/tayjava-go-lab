@@ -1,38 +1,43 @@
-# Lesson 10 — Unit tests and table-driven tests
+# Lesson 11 — Pointers when you need them
 
-Branch: `lesson-10`  
-Article: [Unit test và table-driven tests với go test](https://tayjava.com/vi/technologies/unit-test-va-table-driven-tests-voi-go-test)
+Branch: `lesson-11`  
+Article: [Pointer đủ dùng trong Golang](https://tayjava.com/vi/technologies/pointer-du-dung-trong-golang)
 
 ## Goal of this branch
 
-Export `RemainingSeats`, write black-box table-driven tests, and assert `ErrNotFound` with `errors.Is`.
+Mutate `Course.Seats` through a pointer (`Reserve`), contrast with pass-by-value (`ReserveCopy`), and handle `nil` safely.
 
-## Changes vs `lesson-09`
+## Changes vs `lesson-10`
 
 | Add / change | Why |
 |--------------|-----|
-| `course/seats.go` | `RemainingSeats` + `ErrInvalidEnrollment` |
-| `course/seats_test.go` | `package course_test` table-driven tests |
+| `course/reserve.go` | `Reserve(*Course)` + `ReserveCopy(Course)` |
+| `cmd/ptrdemo/main.go` | Runnable pointer demo |
 | `guideline.md` | This file |
 
 ## Run
 
 ```bash
-git checkout lesson-10
-go test ./course
-go test -v ./course
-go test -run RemainingSeats ./course
+git checkout lesson-11
+go run ./cmd/ptrdemo
 go test ./...
 ```
 
-Expected: all tests PASS. Verbose output shows subtests such as `TestRemainingSeats/over`.
+Expected (shape):
+
+```text
+before reserve: 30
+after reserve: 29
+after reserveCopy (unchanged): 29 (was 29 )
+reserve nil: course is nil
+```
 
 ## Try yourself
 
-1. Change one `want` value and re-run — the failure message includes the case name.
-2. Add a case for `enrolled < 0`.
-3. Prefer `errors.Is` for sentinel errors in assertions.
+1. Call `Reserve` until seats hit 0 and observe the error.
+2. Pass `c` (value) where a pointer is required — read the compiler error.
+3. Sketch `Publish(c *Course) error` that rejects nil / empty title.
 
 ## What the next lesson adds
 
-**Lesson 11** — pointers: `reserve` / `reserveCopy` on `Course` seats.
+**Lesson 12** — `defer`, `panic`, and `recover` used in the right places.
