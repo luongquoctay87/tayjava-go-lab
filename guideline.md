@@ -1,64 +1,64 @@
-# Bài 2 — Go là gì? Cài toolchain và chạy chương trình đầu tiên
+# Lesson 2 — What is Go? Install the toolchain and run your first program
 
 Branch: `lesson-02`  
-Bài viết: [Go là gì? Cài toolchain và chạy chương trình Golang đầu tiên](https://tayjava.com/vi/technologies/go-la-gi-cai-toolchain-va-chay-chuong-trinh-golang-dau-tien)
+Article: [Go là gì? Cài toolchain và chạy chương trình Golang đầu tiên](https://tayjava.com/vi/technologies/go-la-gi-cai-toolchain-va-chay-chuong-trinh-golang-dau-tien)
 
-## Mục tiêu branch này
+## Goal of this branch
 
-Lần đầu có **module lab** chạy được: in lời chào, hiểu `go run` vs `go build`.
+First runnable **lab module**: print a greeting; understand `go run` vs `go build`.
 
-## Thay đổi so với `master` / trước đó
+## Changes vs `master` / previous
 
-| Thêm / đổi | Giải thích |
-|------------|------------|
+| Add / change | Why |
+|--------------|-----|
 | `go.mod` | Module `github.com/tayjava/go-lab` (module mode, Go 1.22+) |
 | `main.go` | `package main` + `Hello, TayJava — Course lab` |
-| `.gitignore` | Bỏ qua `bin/` và artifact local |
-| `README.md` | Cách clone và checkout theo bài |
-| `guideline.md` | File này — đọc trước khi sửa code |
+| `.gitignore` | Ignore `bin/` and local artifacts |
+| `README.md` | How to clone and check out by lesson |
+| `guideline.md` | This file — read before editing code |
 
-Chưa có: `cmd/`, `internal/`, HTTP, DB. Schema Postgres (`db-ddl.sql`) sẽ có từ **bài 22**.
+Not yet: `cmd/`, `internal/`, HTTP, DB. Postgres schema (`db-ddl.sql`) starts at **lesson 22**.
 
-## Cấu trúc hiện tại
+## Layout
 
 ```text
 tayjava-go-lab/
   go.mod
-  main.go          ← entrypoint bài 2 (root)
+  main.go          ← lesson 2 entrypoint (repo root)
   guideline.md
   README.md
   .gitignore
-  bin/             ← tạo khi go build (đã gitignore)
+  bin/             ← created by go build (gitignored)
 ```
 
-## Chạy thử
+## Run
 
-Yêu cầu: Go **1.22+** (`go version`).
+Requires Go **1.22+** (`go version`).
 
 ```bash
 git checkout lesson-02
 go run .
 ```
 
-Kỳ vọng:
+Expected:
 
 ```text
 Hello, TayJava — Course lab
 ```
 
-Build binary:
+Build a binary:
 
 ```bash
 go build -o bin/hello .
 ./bin/hello
 ```
 
-## Việc bạn nên tự làm (học)
+## Try yourself
 
-1. Đọc `main.go`, đổi chuỗi in, chạy lại `go run .`.
-2. So sánh thời điểm tạo file trong `bin/` khi `go build`.
-3. Commit thay đổi thử trên branch riêng của bạn (không bắt buộc push).
+1. Read `main.go`, change the printed string, run `go run .` again.
+2. Compare when files appear under `bin/` after `go build`.
+3. Commit experiments on your own branch (push optional).
 
-## Bài sau sẽ thêm gì?
+## What the next lesson adds
 
-**Bài 3** — biến, kiểu, zero value: thêm demo (ví dụ `cmd/zerodemo`) trên cùng module, không tạo repo mới.
+**Lesson 3** — variables, types, zero values: add a demo (e.g. `cmd/zerodemo`) on the same module; do not create a new repo.

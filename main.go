@@ -3,6 +3,6 @@ package main
 import "fmt"
 
 func main() {
-	// Lab series Golang TayJava — bài 2
+	// TayJava Golang series lab — lesson 2
 	fmt.Println("Hello, TayJava — Course lab")
 }

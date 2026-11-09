@@ -1,86 +1,87 @@
 # TayJava Go Lab
 
-Companion source cho series **Golang từ Beginner tới Senior** của [TayJava](https://tayjava.com).
+Companion source for the **Golang from Beginner to Senior** series by [TayJava](https://tayjava.com).
 
-Một module Go xuyên suốt lộ trình — domain e-learning (`Course`, `Enrollment`, …). Mỗi bài học là một branch chạy được; file `guideline.md` trên branch đó giải thích code vừa thêm hoặc đổi gì.
+One Go module across the whole path — e-learning domain (`Course`, `Enrollment`, …). Each lesson is a runnable git branch; that branch’s `guideline.md` explains what was added or changed.
 
 | | |
 |---|---|
 | **Module** | `github.com/tayjava/go-lab` |
 | **Go** | 1.22+ |
 | **Remote** | https://github.com/luongquoctay87/tayjava-go-lab |
+| **Language** | **English** for all source, comments, SQL comments, `README.md`, and `guideline.md` |
 
-## Yêu cầu
+## Requirements
 
 - Go **1.22+** (`go version`)
 - Git
 - Terminal (macOS / Linux / Windows)
 
-## Bắt đầu nhanh
+## Quick start
 
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
 git checkout lesson-02
-cat guideline.md    # đọc trước khi sửa
+cat guideline.md    # read before you edit
 go run .
 ```
 
-Kỳ vọng (bài 2):
+Expected (lesson 2):
 
 ```text
 Hello, TayJava — Course lab
 ```
 
-Build binary:
+Build a binary:
 
 ```bash
 go build -o bin/hello .
 ./bin/hello
 ```
 
-## Cách học với repo này
+## How to learn with this repo
 
-1. Mở bài viết trên TayJava (cùng số bài).
-2. `git checkout lesson-NN` khớp số bài.
-3. Đọc **`guideline.md`** — diff ý tưởng so với bài trước.
-4. Chạy code, làm bài tập trong guideline / bài viết.
-5. Sang bài sau: checkout branch kế tiếp (logic cộng dồn, không tạo project mới).
+1. Open the matching TayJava article (same lesson number).
+2. `git checkout lesson-NN` for that lesson.
+3. Read **`guideline.md`** — conceptual diff vs the previous lesson.
+4. Run the code; do the exercises in the guideline / article.
+5. Move on: check out the next branch (cumulative lab — no new project).
 
-`master` chỉ là điểm neo / README. **Học trên `lesson-NN`**, không đoán thiếu file từ `master`.
+`master` is only an anchor / README. **Learn on `lesson-NN`**; do not guess missing files from `master`.
 
-## Branch hiện có
+## Branches available
 
-| Branch | Bài | Nội dung |
-|--------|-----|----------|
-| `master` | — | README, điểm xuất phát |
+| Branch | Lesson | Contents |
+|--------|--------|----------|
+| `master` | — | README, starting point |
 | `lesson-02` | 2 | Module + Hello (`go run` / `go build`) |
 
-Các branch `lesson-03` … sẽ thêm theo series (biến/zero value → … → lab CLI → REST API → worker).
+Branches `lesson-03` … will follow the series (zero values → … → CLI lab → REST API → worker).
 
-## Quy ước
+## Conventions
 
-- **Một bài = một branch** `lesson-NN` (số có zero-pad: `02`, `03`, …).
-- Mỗi branch có **`guideline.md`** (bắt buộc đọc).
-- Code trên branch phải **chạy được** với lệnh ghi trong guideline.
-- Schema Postgres **`db-ddl.sql`**: xuất hiện từ **`lesson-22` trở đi** (Course / Enrollment); các branch trước đó không có file này.
-- Identifier tiếng Anh; comment / guideline tiếng Việt.
+- **One lesson = one branch** `lesson-NN` (zero-padded: `02`, `03`, …).
+- Every branch has **`guideline.md`** (read it first).
+- Code on a branch must **run** with the commands in that guideline.
+- **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
+- Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Cấu trúc (bài 2)
+## Layout (lesson 2)
 
 ```text
 tayjava-go-lab/
 ├── README.md
-├── guideline.md      # đổi theo từng branch
+├── guideline.md      # per-branch
 ├── go.mod
-├── main.go           # entrypoint bài 2
+├── main.go           # lesson 2 entrypoint
 ├── .gitignore
 └── bin/              # local build (gitignored)
 ```
 
-Các bài sau sẽ thêm `cmd/`, `internal/`, … trên cùng module. `db-ddl.sql` chỉ có từ bài 22.
+Later lessons add `cmd/`, `internal/`, … on the same module. `db-ddl.sql` appears from lesson 22.
 
-## Lệnh thường dùng
+## Common commands
 
 ```bash
 go version
@@ -91,11 +92,11 @@ git branch -a
 git checkout lesson-02
 ```
 
-## Series & hỗ trợ
+## Series & support
 
-- Lộ trình bài viết: series Golang trên TayJava (bắt đầu từ bài 1 — bản đồ; lab code từ bài 2).
-- Issue trên GitHub: lỗi chạy lab / lệch guideline so với bài viết.
+- Article roadmap: Golang series on TayJava (map starts at lesson 1; lab code from lesson 2).
+- GitHub issues: lab won’t run / guideline drifts from the article.
 
 ## License
 
-Nội dung lab phục vụ học tập kèm series TayJava. Giữ nguyên ghi chú nguồn khi fork hoặc dùng lại trong khóa nội bộ.
+Lab content is for learning with the TayJava series. Keep attribution if you fork or reuse in an internal course.
