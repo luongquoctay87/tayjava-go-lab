@@ -23,7 +23,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-23   # or lesson-02 … lesson-22
+git checkout lesson-24   # or lesson-02 … lesson-23
 cat guideline.md         # read before you edit
 ```
 
@@ -43,13 +43,12 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Lesson 23 validated API:
+Lesson 24 httptest:
 
 ```bash
-git checkout lesson-23
-go test ./internal/course ./internal/api
+git checkout lesson-24
+go test ./internal/api/ -v
 go run ./cmd/api
-# curl -d '{"courseId":0,"userId":7}' -H 'Content-Type: application/json' http://localhost:8080/api/enrollments
 ```
 
 ## How to learn with this repo
@@ -89,8 +88,9 @@ go run ./cmd/api
 | `lesson-21` | 21 | Handler → service → memory repository |
 | `lesson-22` | 22 | Postgres `database/sql` + `db-ddl.sql` |
 | `lesson-23` | 23 | Validation + centralized HTTP errors |
+| `lesson-24` | 24 | httptest table-driven HTTP tests |
 
-Later branches continue httptest, config, Docker, and the Intermediate lab.
+Later branches continue config, Docker, and the Intermediate lab.
 
 ## Conventions
 
@@ -100,7 +100,7 @@ Later branches continue httptest, config, Docker, and the Intermediate lab.
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: present from **`lesson-22` onward**. Apply with `psql "$DATABASE_URL" -f db-ddl.sql`. Capacity column is **`seats`** (not `seats_left`).
 
-## Layout (lesson 23)
+## Layout (lesson 24)
 
 ```text
 tayjava-go-lab/
@@ -138,7 +138,7 @@ go test ./internal/api ./internal/course
 go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-23
+git checkout lesson-24
 # psql "$DATABASE_URL" -f db-ddl.sql
 ```
 

@@ -1,78 +1,46 @@
-# Lesson 23 — Validation and centralized HTTP errors
+# Lesson 24 — HTTP tests with httptest
 
-Branch: `lesson-23`  
-Article: [Validation và xử lý lỗi HTTP tập trung trong Golang](https://tayjava.com/vi/technologies/validation-va-xu-ly-loi-http-tap-trung-trong-golang)
+Branch: `lesson-24`  
+Article: [Test HTTP trong Golang bằng httptest](https://tayjava.com/vi/technologies/test-http-trong-golang-bang-httptest)
 
 ## Goal of this branch
 
-Validate JSON at the HTTP edge (`DisallowUnknownFields` + simple rules) and map every domain error through one `ErrorBody` / `WriteError` / `MapDomainError` helper. Service still returns domain errors — never HTTP status codes.
+Lock the lesson-23 error contract with table-driven `httptest` tests, a stub `Repository`, mux routing smoke test, and a canceled-context case — no real listen port and no Postgres required.
 
-## Changes vs `lesson-22`
+## Changes vs `lesson-23`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/api/errors.go` | `ErrorBody`, `WriteJSON`, `WriteError`, `MapDomainError` |
-| `internal/api/course.go` | Decode/validate + shared error helpers |
-| `internal/api/enrollment.go` | Decode/validate enroll body |
-| `internal/api/handler_test.go` | Assert `VALIDATION` / `NO_SEATS` codes |
-| `README.md` | Branch table through lesson 23 |
+| `internal/api/enrollment_test.go` | Table-driven enroll tests + stubRepo + mux/context cases |
+| `README.md` | Branch table through lesson 24 |
 | `guideline.md` | This file |
 
-`db-ddl.sql` is unchanged (`seats` column kept).
-
-## Error contract
-
-```json
-{"code":"NO_SEATS","message":"no seats left"}
-```
-
-| Kind | Example | Status / code |
-|------|---------|----------------|
-| Input | `courseId: 0`, bad JSON | 400 `VALIDATION` |
-| Business | no seats / already enrolled | 409 `NO_SEATS` / `CONFLICT` |
-| Missing | unknown course | 404 `NOT_FOUND` |
-| System | unexpected | 500 `INTERNAL` (log detail server-side) |
+Handlers and `db-ddl.sql` unchanged. Unit tests stay on MemoryRepo / stubRepo.
 
 ## Layout
 
 ```text
 db-ddl.sql
+internal/api/enrollment_test.go
+internal/api/handler_test.go
 internal/api/errors.go
-internal/api/course.go
-internal/api/enrollment.go
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-23
-go test ./internal/api ./internal/course
+git checkout lesson-24
+go test ./internal/api/ -v
+go test ./...
 go build -o bin/api ./cmd/api
-./bin/api
-```
-
-```bash
-curl -i -d '{"courseId":0,"userId":7}' -H 'Content-Type: application/json' \
-  http://localhost:8080/api/enrollments
-# 400 VALIDATION
-
-curl -i -d '{"courseId":1,"userId":7}' -H 'Content-Type: application/json' \
-  http://localhost:8080/api/enrollments
-# enroll until seats=0 → 409 NO_SEATS
-```
-
-Apply schema when using Postgres:
-
-```bash
-psql "$DATABASE_URL" -f db-ddl.sql
 ```
 
 ## Try yourself
 
-1. Send unknown JSON field (`course_id`) — expect `VALIDATION` / invalid json.
-2. Force a non-domain error path and confirm the client only sees `INTERNAL`.
-3. Keep service free of `net/http` imports.
+1. Flip expected status in a subtest and watch the failure message (status + body).
+2. Add a case for unknown JSON fields (`DisallowUnknownFields`).
+3. Call `t.Parallel()` carefully — use a fresh stubRepo per subtest.
 
 ## What the next lesson adds
 
-**Lesson 24** — lock the error contract with table-driven `httptest` tests.
+**Lesson 25** — env-based `Config` (twelve-factor light): `DATABASE_URL`, `HTTP_ADDR`.
