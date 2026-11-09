@@ -21,10 +21,10 @@ func TestServiceEnroll(t *testing.T) {
 		}
 	}{
 		{
-			name:     "two users until empty",
+			name:     "two users until full",
 			seats:    1,
 			firstUID: 7,
-			second:   struct {
+			second: struct {
 				uid     int64
 				wantErr error
 			}{uid: 8, wantErr: course.ErrNoSeats},
@@ -33,7 +33,7 @@ func TestServiceEnroll(t *testing.T) {
 			name:     "same user conflict",
 			seats:    2,
 			firstUID: 7,
-			second:   struct {
+			second: struct {
 				uid     int64
 				wantErr error
 			}{uid: 7, wantErr: course.ErrConflict},
@@ -49,10 +49,10 @@ func TestServiceEnroll(t *testing.T) {
 			}
 			svc := course.NewService(repo)
 
-			if err := svc.Enroll(ctx, 10, tt.firstUID); err != nil {
+			if _, err := svc.Enroll(ctx, 10, tt.firstUID); err != nil {
 				t.Fatalf("first enroll: %v", err)
 			}
-			err = svc.Enroll(ctx, 10, tt.second.uid)
+			_, err = svc.Enroll(ctx, 10, tt.second.uid)
 			if !errors.Is(err, tt.second.wantErr) {
 				t.Fatalf("second enroll: got %v want %v", err, tt.second.wantErr)
 			}
@@ -62,7 +62,7 @@ func TestServiceEnroll(t *testing.T) {
 
 func TestServiceEnrollNotFound(t *testing.T) {
 	svc := course.NewService(course.NewMemoryRepo())
-	err := svc.Enroll(context.Background(), 999, 1)
+	_, err := svc.Enroll(context.Background(), 999, 1)
 	if !errors.Is(err, course.ErrNotFound) {
 		t.Fatalf("got %v want ErrNotFound", err)
 	}
@@ -84,5 +84,20 @@ func TestServiceCreateAndGet(t *testing.T) {
 	}
 	if got.Title != "Pointers" || got.Seats != 15 {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestServiceListEnrollments(t *testing.T) {
+	ctx := context.Background()
+	svc := course.NewService(course.NewMemoryRepo())
+	if _, err := svc.Enroll(ctx, 1, 7); err != nil {
+		t.Fatal(err)
+	}
+	list, err := svc.ListEnrollments(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].UserID != 7 {
+		t.Fatalf("list=%+v", list)
 	}
 }

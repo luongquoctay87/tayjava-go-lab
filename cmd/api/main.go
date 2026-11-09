@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -17,7 +18,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db, err := course.OpenDB(cfg.DatabaseURL)
+	db, err := course.OpenDBWithRetry(cfg.DatabaseURL, 30, time.Second)
 	if err != nil {
 		log.Fatalf("postgres: %v", err)
 	}
@@ -31,6 +32,14 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
+
+	// Intermediate lab routes (lesson 27)
+	mux.HandleFunc("GET /courses/{id}", courses.Get)
+	mux.HandleFunc("POST /courses", courses.Create)
+	mux.HandleFunc("POST /courses/{id}/enrollments", enrollments.CreateNested)
+	mux.HandleFunc("GET /courses/{id}/enrollments", enrollments.List)
+
+	// Aliases kept from earlier lessons
 	mux.HandleFunc("GET /api/courses/{id}", courses.Get)
 	mux.HandleFunc("POST /api/courses", courses.Create)
 	mux.HandleFunc("POST /api/enrollments", enrollments.Create)

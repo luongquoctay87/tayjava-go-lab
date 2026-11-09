@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/lib/pq"
 )
 
-// PostgresRepo persists Course rows with database/sql.
+// PostgresRepo persists Course and Enrollment rows with database/sql.
 type PostgresRepo struct {
 	db *sql.DB
 }
@@ -53,6 +55,51 @@ func (p *PostgresRepo) Save(ctx context.Context, c Course) (Course, error) {
 	return c, nil
 }
 
+// CountEnrollments returns enrollment rows for a course.
+func (p *PostgresRepo) CountEnrollments(ctx context.Context, courseID int64) (int, error) {
+	const q = `SELECT COUNT(*) FROM enrollments WHERE course_id = $1`
+	var n int
+	err := p.db.QueryRowContext(ctx, q, courseID).Scan(&n)
+	return n, err
+}
+
+// InsertEnrollment inserts a row; unique (course_id, user_id) maps to ErrConflict.
+func (p *PostgresRepo) InsertEnrollment(ctx context.Context, courseID, userID int64) (Enrollment, error) {
+	const q = `
+INSERT INTO enrollments (course_id, user_id) VALUES ($1, $2)
+RETURNING id, course_id, user_id`
+	var e Enrollment
+	err := p.db.QueryRowContext(ctx, q, courseID, userID).Scan(&e.ID, &e.CourseID, &e.UserID)
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return Enrollment{}, ErrConflict
+		}
+		return Enrollment{}, err
+	}
+	return e, nil
+}
+
+// ListEnrollments returns enrollments for a course ordered by id.
+func (p *PostgresRepo) ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error) {
+	const q = `SELECT id, course_id, user_id FROM enrollments WHERE course_id = $1 ORDER BY id`
+	rows, err := p.db.QueryContext(ctx, q, courseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]Enrollment, 0)
+	for rows.Next() {
+		var e Enrollment
+		if err := rows.Scan(&e.ID, &e.CourseID, &e.UserID); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 // OpenDB opens a Postgres pool and verifies connectivity with PingContext.
 func OpenDB(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dsn)
@@ -69,4 +116,18 @@ func OpenDB(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+// OpenDBWithRetry retries OpenDB so Compose can wait for Postgres readiness.
+func OpenDBWithRetry(dsn string, attempts int, delay time.Duration) (*sql.DB, error) {
+	var last error
+	for i := 0; i < attempts; i++ {
+		db, err := OpenDB(dsn)
+		if err == nil {
+			return db, nil
+		}
+		last = err
+		time.Sleep(delay)
+	}
+	return nil, last
 }

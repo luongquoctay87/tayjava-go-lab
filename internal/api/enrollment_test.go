@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,8 +15,10 @@ import (
 
 // stubRepo fakes Repository so handler tests need no Postgres.
 type stubRepo struct {
-	course course.Course
-	err    error
+	course      course.Course
+	err         error
+	enrollCount int
+	enrolled    map[string]struct{}
 }
 
 func (s stubRepo) Get(ctx context.Context, id int64) (course.Course, error) {
@@ -36,6 +39,34 @@ func (s stubRepo) Save(ctx context.Context, c course.Course) (course.Course, err
 		return course.Course{}, err
 	}
 	return c, nil
+}
+
+func (s stubRepo) CountEnrollments(ctx context.Context, courseID int64) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return s.enrollCount, nil
+}
+
+func (s stubRepo) InsertEnrollment(ctx context.Context, courseID, userID int64) (course.Enrollment, error) {
+	if err := ctx.Err(); err != nil {
+		return course.Enrollment{}, err
+	}
+	if s.enrolled != nil {
+		k := fmt.Sprintf("%d:%d", courseID, userID)
+		if _, ok := s.enrolled[k]; ok {
+			return course.Enrollment{}, course.ErrConflict
+		}
+		s.enrolled[k] = struct{}{}
+	}
+	return course.Enrollment{ID: 1, CourseID: courseID, UserID: userID}, nil
+}
+
+func (s stubRepo) ListEnrollments(ctx context.Context, courseID int64) ([]course.Enrollment, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func TestEnrollmentCreate(t *testing.T) {
@@ -68,7 +99,10 @@ func TestEnrollmentCreate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := stubRepo{course: course.Course{ID: 1, Title: "Go", Seats: 1, Level: "beginner"}}
+			r := stubRepo{
+				course:   course.Course{ID: 1, Title: "Go", Seats: 1, Level: "beginner"},
+				enrolled: make(map[string]struct{}),
+			}
 			if tc.seats0 {
 				r.course.Seats = 0
 			}
@@ -97,16 +131,32 @@ func TestEnrollmentCreate(t *testing.T) {
 	}
 }
 
+func TestEnrollmentCreateNested(t *testing.T) {
+	repo := course.NewMemoryRepo()
+	svc := course.NewService(repo)
+	h := api.NewEnrollmentHandler(svc)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /courses/{id}/enrollments", h.CreateNested)
+
+	req := httptest.NewRequest(http.MethodPost, "/courses/1/enrollments", bytes.NewBufferString(`{"userId":7}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestGetCourseRoute(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/courses/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /courses/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if r.PathValue("id") != "42" {
 			t.Fatalf("id=%s", r.PathValue("id"))
 		}
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/courses/42", nil)
+	req := httptest.NewRequest(http.MethodGet, "/courses/42", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -117,7 +167,8 @@ func TestGetCourseRoute(t *testing.T) {
 
 func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	h := api.NewEnrollmentHandler(course.NewService(stubRepo{
-		course: course.Course{ID: 1, Title: "Go", Seats: 1},
+		course:   course.Course{ID: 1, Title: "Go", Seats: 1},
+		enrolled: make(map[string]struct{}),
 	}))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

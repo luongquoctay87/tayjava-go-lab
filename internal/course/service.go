@@ -9,21 +9,22 @@ import (
 var (
 	// ErrNotFound means the course id is unknown.
 	ErrNotFound = errors.New("course not found")
-	// ErrNoSeats means capacity is exhausted.
+	// ErrNoSeats means capacity (seats) is exhausted.
 	ErrNoSeats = errors.New("no seats left")
 	// ErrConflict means the user is already enrolled.
 	ErrConflict = errors.New("already enrolled")
+	// ErrFull is an alias used in Intermediate lab notes (same as ErrNoSeats).
+	ErrFull = ErrNoSeats
 )
 
 // Service holds Course use-cases. It does not import net/http.
 type Service struct {
-	repo     Repository
-	enrolled map[string]struct{}
+	repo Repository
 }
 
 // NewService wires a repository implementation.
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo, enrolled: make(map[string]struct{})}
+	return &Service{repo: repo}
 }
 
 // GetCourse loads a course by id.
@@ -43,21 +44,31 @@ func (s *Service) CreateCourse(ctx context.Context, c Course) (Course, error) {
 	return s.repo.Save(ctx, c)
 }
 
-// Enroll reserves one seat for userID on courseID.
-func (s *Service) Enroll(ctx context.Context, courseID, userID int64) error {
+// Enroll registers userID on courseID when capacity (seats) remains.
+// seats is total capacity; enrollments are counted separately (not seats_left).
+func (s *Service) Enroll(ctx context.Context, courseID, userID int64) (Enrollment, error) {
 	c, err := s.repo.Get(ctx, courseID)
 	if err != nil {
-		return err
+		return Enrollment{}, err
 	}
-	if c.Seats <= 0 {
-		return ErrNoSeats
+	n, err := s.repo.CountEnrollments(ctx, courseID)
+	if err != nil {
+		return Enrollment{}, err
 	}
-	key := fmt.Sprintf("%d:%d", courseID, userID)
-	if _, ok := s.enrolled[key]; ok {
-		return ErrConflict
+	if n >= c.Seats {
+		return Enrollment{}, ErrNoSeats
 	}
-	s.enrolled[key] = struct{}{}
-	c.Seats--
-	_, err = s.repo.Save(ctx, c)
-	return err
+	en, err := s.repo.InsertEnrollment(ctx, courseID, userID)
+	if err != nil {
+		return Enrollment{}, err
+	}
+	return en, nil
+}
+
+// ListEnrollments returns enrollments for a course (404 if course missing).
+func (s *Service) ListEnrollments(ctx context.Context, courseID int64) ([]Enrollment, error) {
+	if _, err := s.repo.Get(ctx, courseID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListEnrollments(ctx, courseID)
 }

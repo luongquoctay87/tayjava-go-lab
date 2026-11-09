@@ -16,14 +16,15 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 - Go **1.22+** (`go version`)
 - Git
 - Terminal (macOS / Linux / Windows)
-- Postgres from lesson 22 (`DATABASE_URL`; required to run the API from lesson 25)
+- Docker / Docker Compose optional for lessons 26–27
+- Postgres from lesson 22 (`DATABASE_URL`)
 
 ## Quick start
 
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-26   # or lesson-02 … lesson-25
+git checkout lesson-27   # or lesson-02 … lesson-26
 cat guideline.md         # read before you edit
 ```
 
@@ -35,20 +36,13 @@ go run .
 # Hello, TayJava — Course lab
 ```
 
-Lesson 13 Course CLI:
+Lesson 27 Intermediate lab:
 
 ```bash
-git checkout lesson-13
-go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
-go run ./cmd/course-cli list
-```
-
-Lesson 26 Docker image:
-
-```bash
-git checkout lesson-26
+git checkout lesson-27
 go test ./...
-docker build -t tayjava/course-api:dev .
+docker compose up --build
+# curl -d '{"title":"Go Intermediate","seats":2}' -H 'Content-Type: application/json' http://localhost:8080/courses
 ```
 
 ## How to learn with this repo
@@ -91,8 +85,7 @@ docker build -t tayjava/course-api:dev .
 | `lesson-24` | 24 | httptest table-driven HTTP tests |
 | `lesson-25` | 25 | Env config / twelve-factor light |
 | `lesson-26` | 26 | Docker multi-stage Course API image |
-
-Next: Intermediate lab (**lesson 27**).
+| `lesson-27` | 27 | Intermediate lab: Course REST + enrollment |
 
 ## Conventions
 
@@ -102,16 +95,17 @@ Next: Intermediate lab (**lesson 27**).
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: present from **`lesson-22` onward**. Apply with `psql "$DATABASE_URL" -f db-ddl.sql`. Capacity column is **`seats`** (not `seats_left`).
 
-## Layout (lesson 26)
+## Layout (lesson 27)
 
 ```text
 tayjava-go-lab/
 ├── README.md
 ├── guideline.md
 ├── Dockerfile
+├── docker-compose.yml
 ├── .dockerignore
 ├── .env.example
-├── db-ddl.sql               # courses + enrollments (seats)
+├── db-ddl.sql
 ├── go.mod
 ├── main.go
 ├── course/
@@ -128,21 +122,12 @@ tayjava-go-lab/
 
 ```bash
 go version
-go run .
-go run ./cmd/course-cli list
-go run ./cmd/goroutine-lab
-go run ./cmd/channel-lab
-go run ./cmd/select-lab
-go run ./cmd/synclab
-go run ./cmd/contextlab
-go run ./cmd/api
-go test ./internal/api ./internal/course ./internal/config
-go test -race ./internal/seatledger
 go test ./...
+go build -o bin/api ./cmd/api
+docker compose up --build
 git branch -a
-git checkout lesson-26
+git checkout lesson-27
 # psql "$DATABASE_URL" -f db-ddl.sql
-# docker build -t tayjava/course-api:dev .
 ```
 
 ## Series & support
