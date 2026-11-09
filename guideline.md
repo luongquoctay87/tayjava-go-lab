@@ -1,19 +1,19 @@
-# Lesson 32 — Benchmarks and pprof
+# Lesson 33 — Structured logging with slog
 
-Branch: `lesson-32`  
-Article: [Benchmarks and pprof in Golang](https://tayjava.com/vi/technologies/benchmarks-and-pprof-in-golang-find-cpu-and-heap-hotspots)
+Branch: `lesson-33`  
+Article: [Structured logging with slog in Golang](https://tayjava.com/vi/technologies/structured-logging-with-slog-in-golang)
 
 ## Goal of this branch
 
-Compare `DescribeSlow` vs `DescribeFast` with benchmarks (`-benchmem`) and attach `net/http/pprof` on `127.0.0.1:6060`.
+Use `log/slog` JSON as the default handler. Access logs carry `request_id`; enroll logs always include `course_id` / `user_id`. Never log JWTs or passwords.
 
-## Changes vs `lesson-31`
+## Changes vs `lesson-32`
 
 | Add / change | Why |
 |--------------|-----|
-| `course/describe.go` | Slow concat vs `strings.Builder` |
-| `course/describe_test.go` | Benchmarks + equality check |
-| `cmd/api/main.go` | Localhost pprof server |
+| `cmd/api/main.go` | `slog.SetDefault` JSON Info handler |
+| `internal/api/middleware.go` | Structured access log + `X-Request-ID` |
+| `internal/api/enrollment.go` | enroll_attempt / enroll_failed / list count |
 | `README.md` / `guideline.md` | This lesson |
 
 `db-ddl.sql` unchanged.
@@ -21,17 +21,11 @@ Compare `DescribeSlow` vs `DescribeFast` with benchmarks (`-benchmem`) and attac
 ## Run
 
 ```bash
-git checkout lesson-32
-go test ./course -bench=Describe -benchmem
+git checkout lesson-33
+go test ./internal/api/...
 go build -o bin/api ./cmd/api
-```
-
-Profile (API running):
-
-```bash
-go tool pprof -http=:8081 http://127.0.0.1:6060/debug/pprof/profile?seconds=15
 ```
 
 ## What the next lesson adds
 
-**Lesson 33** — structured logging with `log/slog` (JSON, `course_id` / `request_id`).
+**Lesson 34** — basic metrics counters / OpenTelemetry concepts (light demo).

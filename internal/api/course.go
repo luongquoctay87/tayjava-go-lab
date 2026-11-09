@@ -11,8 +11,8 @@ import (
 
 // CourseHandler exposes Course HTTP endpoints.
 type CourseHandler struct {
-	svc      *course.Service
-	seatCap  int
+	svc     *course.Service
+	seatCap int
 }
 
 // NewCourseHandler constructs a CourseHandler.

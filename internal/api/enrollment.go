@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -71,8 +72,19 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
+	slog.Info("enroll_attempt",
+		"request_id", RequestIDFrom(r.Context()),
+		"course_id", courseID,
+		"user_id", in.UserID,
+	)
 	en, err := h.svc.Enroll(r.Context(), courseID, in.UserID)
 	if err != nil {
+		slog.Error("enroll_failed",
+			"request_id", RequestIDFrom(r.Context()),
+			"course_id", courseID,
+			"user_id", in.UserID,
+			"err", err.Error(),
+		)
 		MapDomainError(w, err)
 		return
 	}
@@ -92,6 +104,11 @@ func (h EnrollmentHandler) List(w http.ResponseWriter, r *http.Request) {
 		MapDomainError(w, err)
 		return
 	}
+	slog.Info("list_enrollments",
+		"request_id", RequestIDFrom(r.Context()),
+		"course_id", courseID,
+		"count", len(list),
+	)
 	WriteJSON(w, http.StatusOK, list)
 }
 
@@ -106,8 +123,19 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
+	slog.Info("enroll_attempt",
+		"request_id", RequestIDFrom(r.Context()),
+		"course_id", in.CourseID,
+		"user_id", in.UserID,
+	)
 	en, err := h.svc.Enroll(r.Context(), in.CourseID, in.UserID)
 	if err != nil {
+		slog.Error("enroll_failed",
+			"request_id", RequestIDFrom(r.Context()),
+			"course_id", in.CourseID,
+			"user_id", in.UserID,
+			"err", err.Error(),
+		)
 		MapDomainError(w, err)
 		return
 	}

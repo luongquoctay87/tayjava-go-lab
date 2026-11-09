@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -19,6 +21,8 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)

@@ -91,6 +91,7 @@ docker compose up --build
 | `lesson-30` | 30 | Race detector: unsafe vs safe course cache |
 | `lesson-31` | 31 | Generics helpers (Unique / First) |
 | `lesson-32` | 32 | Benchmarks + localhost pprof |
+| `lesson-33` | 33 | slog JSON + request_id / course_id |
 
 ## Conventions
 

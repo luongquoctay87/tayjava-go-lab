@@ -1,7 +1,10 @@
 package api
 
 import (
-	"log"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -19,13 +22,37 @@ func (w *statusWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
-// Logging logs method, path, status, and duration.
+type ctxKey string
+
+const requestIDKey ctxKey = "requestID"
+
+// RequestIDFrom returns the request id attached by Logging middleware.
+func RequestIDFrom(ctx context.Context) string {
+	v, _ := ctx.Value(requestIDKey).(string)
+	return v
+}
+
+// Logging emits structured JSON access logs with request_id.
 func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		rid := r.Header.Get("X-Request-ID")
+		if rid == "" {
+			rid = newRequestID()
+		}
+		ctx := context.WithValue(r.Context(), requestIDKey, rid)
+		r = r.WithContext(ctx)
+		w.Header().Set("X-Request-ID", rid)
+
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, sw.code, time.Since(start))
+		slog.Info("http_request",
+			"request_id", rid,
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", sw.code,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
 	})
 }
 
@@ -34,10 +61,16 @@ func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				log.Printf("panic: %v", rec)
+				slog.Error("panic", "request_id", RequestIDFrom(r.Context()), "err", rec)
 				http.Error(w, "internal error", http.StatusInternalServerError)
 			}
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+func newRequestID() string {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }
