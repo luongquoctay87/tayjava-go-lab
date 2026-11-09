@@ -16,13 +16,14 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 - Go **1.22+** (`go version`)
 - Git
 - Terminal (macOS / Linux / Windows)
+- Postgres optional from lesson 22 (`DATABASE_URL`)
 
 ## Quick start
 
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-21   # or lesson-02 … lesson-20
+git checkout lesson-22   # or lesson-02 … lesson-21
 cat guideline.md         # read before you edit
 ```
 
@@ -42,13 +43,15 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Lesson 21 layered API:
+Lesson 22 Postgres API:
 
 ```bash
-git checkout lesson-21
+git checkout lesson-22
+# export DATABASE_URL='postgres://tayjava:tayjava@localhost:5432/tayjava?sslmode=disable'
+# psql "$DATABASE_URL" -f db-ddl.sql
 go test ./internal/course ./internal/api
 go run ./cmd/api
-# curl http://localhost:8080/api/courses/1
+# curl -d '{"title":"Go Context","seats":30}' -H 'Content-Type: application/json' http://localhost:8080/api/courses
 ```
 
 ## How to learn with this repo
@@ -86,8 +89,9 @@ go run ./cmd/api
 | `lesson-19` | 19 | net/http Course API (`cmd/api`) |
 | `lesson-20` | 20 | JSON + logging/recovery middleware |
 | `lesson-21` | 21 | Handler → service → memory repository |
+| `lesson-22` | 22 | Postgres `database/sql` + `db-ddl.sql` |
 
-Next: Postgres + `db-ddl.sql` from **lesson 22**.
+Later branches continue validation, httptest, config, Docker, and the Intermediate lab.
 
 ## Conventions
 
@@ -95,20 +99,21 @@ Next: Postgres + `db-ddl.sql` from **lesson 22**.
 - Every branch has **`guideline.md`** (read it first).
 - Code on a branch must **run** with the commands in that guideline.
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
-- Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
+- Postgres schema **`db-ddl.sql`**: present from **`lesson-22` onward**. Apply with `psql "$DATABASE_URL" -f db-ddl.sql`. Capacity column is **`seats`** (not `seats_left`).
 
-## Layout (lesson 21)
+## Layout (lesson 22)
 
 ```text
 tayjava-go-lab/
 ├── README.md
 ├── guideline.md
+├── db-ddl.sql               # courses + enrollments
 ├── go.mod
 ├── main.go
 ├── course/                  # early package demos
 ├── internal/
 │   ├── api/                 # HTTP handlers + middleware
-│   ├── course/              # CLI store + service/repository
+│   ├── course/              # CLI store + MemoryRepo + PostgresRepo
 │   └── seatledger/
 ├── cmd/
 │   ├── course-cli/
@@ -117,10 +122,6 @@ tayjava-go-lab/
 ├── data/
 └── bin/
 ```
-
-No `db-ddl.sql` on this branch (starts at lesson 22).
-
-`db-ddl.sql` appears from lesson 22.
 
 ## Common commands
 
@@ -138,7 +139,8 @@ go test ./internal/api ./internal/course
 go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-21
+git checkout lesson-22
+# psql "$DATABASE_URL" -f db-ddl.sql
 ```
 
 ## Series & support
