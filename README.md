@@ -47,7 +47,7 @@ Lesson 24 httptest:
 
 ```bash
 git checkout lesson-24
-go test ./internal/api/ -v
+go test -race ./internal/api/ -v
 go run ./cmd/api
 ```
 
@@ -86,7 +86,7 @@ go run ./cmd/api
 | `lesson-19` | 19 | net/http Course API (`cmd/api`) |
 | `lesson-20` | 20 | JSON + logging/recovery middleware |
 | `lesson-21` | 21 | Handler → service → memory repository |
-| `lesson-22` | 22 | Postgres `database/sql` + `db-ddl.sql` |
+| `lesson-22` | 22 | Postgres `database/sql` + pgx + golang-migrate |
 | `lesson-23` | 23 | Validation + centralized HTTP errors |
 | `lesson-24` | 24 | httptest table-driven HTTP tests |
 
@@ -98,7 +98,7 @@ Later branches continue config, Docker, and the Intermediate lab.
 - Every branch has **`guideline.md`** (read it first).
 - Code on a branch must **run** with the commands in that guideline.
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
-- Postgres schema **`db-ddl.sql`**: present from **`lesson-22` onward**. Apply with `psql "$DATABASE_URL" -f db-ddl.sql`. Capacity column is **`seats`** (not `seats_left`).
+- Postgres schema from **`lesson-22` onward**: golang-migrate files under `migrations/`, plus `db-ddl.sql` with the same tables. Capacity column is **`seats`** (`INT`, not `seats_left`). Driver is `pgx` stdlib, pinned to v5.7.4 for Go 1.22. DSN is `DATABASE_URL`.
 
 ## Layout (lesson 24)
 
@@ -106,7 +106,8 @@ Later branches continue config, Docker, and the Intermediate lab.
 tayjava-go-lab/
 ├── README.md
 ├── guideline.md
-├── db-ddl.sql               # courses + enrollments (seats)
+├── db-ddl.sql               # same tables as migrations/
+├── migrations/              # golang-migrate .up.sql / .down.sql
 ├── go.mod
 ├── main.go
 ├── course/                  # early package demos
@@ -139,7 +140,7 @@ go test -race ./internal/seatledger
 go test ./...
 git branch -a
 git checkout lesson-24
-# psql "$DATABASE_URL" -f db-ddl.sql
+# migrate -path migrations -database "$DATABASE_URL" up
 ```
 
 ## Series & support

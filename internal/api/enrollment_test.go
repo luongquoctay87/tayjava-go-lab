@@ -13,9 +13,11 @@ import (
 )
 
 // stubRepo fakes Repository so handler tests need no Postgres.
+// It does not count seats; a test picks the error Enroll returns.
 type stubRepo struct {
-	course course.Course
-	err    error
+	course    course.Course
+	err       error // returned by Get, for example course.ErrNotFound
+	enrollErr error // returned by Enroll, for example course.ErrNoSeats
 }
 
 func (s stubRepo) Get(ctx context.Context, id int64) (course.Course, error) {
@@ -38,13 +40,20 @@ func (s stubRepo) Save(ctx context.Context, c course.Course) (course.Course, err
 	return c, nil
 }
 
+func (s stubRepo) Enroll(ctx context.Context, courseID, userID int64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.enrollErr
+}
+
 func TestEnrollmentCreate(t *testing.T) {
 	tests := []struct {
-		name   string
-		body   string
-		want   int
-		code   string
-		seats0 bool
+		name      string
+		body      string
+		enrollErr error
+		want      int
+		code      string
 	}{
 		{
 			name: "ok",
@@ -58,19 +67,25 @@ func TestEnrollmentCreate(t *testing.T) {
 			code: "VALIDATION",
 		},
 		{
-			name:   "no seats",
-			body:   `{"courseId":1,"userId":8}`,
-			want:   http.StatusConflict,
-			code:   "NO_SEATS",
-			seats0: true,
+			name: "unknown field",
+			body: `{"courseId":1,"userId":7,"seat":1}`,
+			want: http.StatusBadRequest,
+			code: "VALIDATION",
+		},
+		{
+			name:      "no seats",
+			body:      `{"courseId":1,"userId":8}`,
+			enrollErr: course.ErrNoSeats,
+			want:      http.StatusConflict,
+			code:      "NO_SEATS",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := stubRepo{course: course.Course{ID: 1, Title: "Go", Seats: 1, Level: "beginner"}}
-			if tc.seats0 {
-				r.course.Seats = 0
+			r := stubRepo{
+				course:    course.Course{ID: 1, Title: "Go", Seats: 1, Level: "beginner"},
+				enrollErr: tc.enrollErr,
 			}
 			h := api.NewEnrollmentHandler(course.NewService(r))
 
@@ -122,8 +137,8 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/enrollments",
-		bytes.NewBufferString(`{"courseId":1,"userId":7}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(`{"courseId":1,"userId":7}`))
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
