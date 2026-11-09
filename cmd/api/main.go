@@ -41,6 +41,11 @@ func main() {
 	// Pool lifetime ≠ signal ctx: drain via Close after HTTP Shutdown.
 	pool := notify.NewPool(context.Background(), 4, 64, notify.FakeSMTP)
 
+	a, err := auth.New([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		log.Fatal(err) // fail fast: never run with an empty or short secret
+	}
+
 	repo := course.NewPostgresRepo(db)
 	svc := course.NewService(repo)
 	counters := &metrics.Counters{}
@@ -50,14 +55,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
 	mux.HandleFunc("GET /metrics", counters.Handler())
-	mux.HandleFunc("POST /login", auth.LoginHandler)
+	mux.HandleFunc("POST /login", a.LoginHandler)
 	mux.HandleFunc("GET /courses/{id}", courses.Get)
 	mux.HandleFunc("POST /courses", courses.Create)
-	mux.Handle("POST /courses/{id}/enrollments", auth.Bearer(http.HandlerFunc(enrollments.CreateNested)))
+	mux.Handle("POST /courses/{id}/enrollments", a.Bearer(http.HandlerFunc(enrollments.CreateNested)))
 	mux.HandleFunc("GET /courses/{id}/enrollments", enrollments.List)
 	mux.HandleFunc("GET /api/courses/{id}", courses.Get)
 	mux.HandleFunc("POST /api/courses", courses.Create)
-	mux.Handle("POST /api/enrollments", auth.Bearer(http.HandlerFunc(enrollments.Create)))
+	mux.Handle("POST /api/enrollments", a.Bearer(http.HandlerFunc(enrollments.Create)))
 
 	var h http.Handler = mux
 	h = api.Recovery(h)

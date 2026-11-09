@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/tayjava/go-lab/internal/api"
+	"github.com/tayjava/go-lab/internal/auth"
 	"github.com/tayjava/go-lab/internal/course"
 )
 
@@ -144,6 +146,35 @@ func TestEnrollmentCreateNested(t *testing.T) {
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestEnrollUsesTokenUserNotBody(t *testing.T) {
+	a, err := auth.New([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, err := a.Issue(7, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := api.NewEnrollmentHandler(course.NewService(course.NewMemoryRepo()), nil, nil, nil)
+	protected := a.Bearer(http.HandlerFunc(h.Create))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(`{"courseId":1,"userId":8}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "bearer "+tok)
+	rec := httptest.NewRecorder()
+	protected.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var en course.Enrollment
+	if err := json.Unmarshal(rec.Body.Bytes(), &en); err != nil {
+		t.Fatal(err)
+	}
+	if en.UserID != 7 {
+		t.Fatalf("userId=%d want token subject 7", en.UserID)
 	}
 }
 

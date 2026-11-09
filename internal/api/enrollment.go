@@ -9,6 +9,7 @@ import (
 
 	"time"
 
+	"github.com/tayjava/go-lab/internal/auth"
 	"github.com/tayjava/go-lab/internal/course"
 	"github.com/tayjava/go-lab/internal/metrics"
 	"github.com/tayjava/go-lab/internal/notify"
@@ -74,9 +75,11 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	if msg := in.validateNested(); msg != "" {
-		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
-		return
+	if _, authed := auth.UserIDFrom(r.Context()); !authed {
+		if msg := in.validateNested(); msg != "" {
+			WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
+			return
+		}
 	}
 	h.enroll(w, r, courseID, in.UserID)
 }
@@ -108,7 +111,12 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	if msg := in.validateFlat(); msg != "" {
+	if _, authed := auth.UserIDFrom(r.Context()); authed {
+		if in.CourseID <= 0 {
+			WriteError(w, http.StatusBadRequest, "VALIDATION", "courseId must be positive")
+			return
+		}
+	} else if msg := in.validateFlat(); msg != "" {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
@@ -116,6 +124,10 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, courseID, userID int64) {
+	// Protected routes take the user from the JWT. Direct handler tests have no token and still pass userId in the body.
+	if id, ok := auth.UserIDFrom(r.Context()); ok {
+		userID = id
+	}
 	key := r.Header.Get("Idempotency-Key")
 	slog.Info("enroll_attempt",
 		"request_id", RequestIDFrom(r.Context()),
