@@ -1,37 +1,29 @@
-# Lesson 30 — Data races and go test -race
+# Lesson 31 — Generics where they pay off
 
-Branch: `lesson-30`  
-Article: [Data races and go test -race in Golang](https://tayjava.com/vi/technologies/data-races-and-go-test-race-in-golang)
+Branch: `lesson-31`  
+Article: [Generics in Golang — use them where they pay off](https://tayjava.com/vi/technologies/generics-in-golang-use-them-where-they-pay-off)
 
 ## Goal of this branch
 
-Show a shared Course cache race and the mutex fix. Make `-race` part of the lab habit for concurrent packages.
+Add small generic helpers (`Unique`, `First`, `MapIDs`). Do **not** genericize `EnrollmentService` — keep the Course domain concrete.
 
-## Changes vs `lesson-29`
+## Changes vs `lesson-30`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/coursecache` | Unsafe vs Safe cache + concurrent test |
-| `unsafe_race_test.go` | Build-tag demo that fails under `-race` |
+| `internal/genericslab` | `Unique` / `First` / `MapIDs` + tests |
 | `README.md` / `guideline.md` | This lesson |
 
-`db-ddl.sql` unchanged.
+`db-ddl.sql` unchanged. Note: we deliberately did not invent `Repository[T]`.
 
 ## Run
 
 ```bash
-git checkout lesson-30
-go test -race ./internal/coursecache/...
-go test -race ./internal/notify/... ./internal/export/...
+git checkout lesson-31
+go test ./internal/genericslab/...
 go build ./...
-```
-
-Deliberate race (expect FAIL):
-
-```bash
-go test -race -tags=racedemo ./internal/coursecache -run TestUnsafeCacheRace -count=1
 ```
 
 ## What the next lesson adds
 
-**Lesson 31** — generics helpers (`Unique` / `First`) where they pay off.
+**Lesson 32** — benchmarks (`DescribeSlow`/`DescribeFast`) and `net/http/pprof` on `:6060`.
