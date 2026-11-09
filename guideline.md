@@ -1,64 +1,62 @@
-# Lesson 2 — What is Go? Install the toolchain and run your first program
+# Lesson 3 — Variables, types, and zero values
 
-Branch: `lesson-02`  
-Article: [Go là gì? Cài toolchain và chạy chương trình Golang đầu tiên](https://tayjava.com/vi/technologies/go-la-gi-cai-toolchain-va-chay-chuong-trinh-golang-dau-tien)
+Branch: `lesson-03`  
+Article: [Biến, kiểu dữ liệu và zero value trong Golang](https://tayjava.com/vi/technologies/bien-kieu-du-lieu-va-zero-value-trong-golang)
 
 ## Goal of this branch
 
-First runnable **lab module**: print a greeting; understand `go run` vs `go build`.
+Practice `var` vs `:=`, numeric conversion, and zero values on a Course-domain demo — same module as lesson 2.
 
-## Changes vs `master` / previous
+## Changes vs `lesson-02`
 
 | Add / change | Why |
 |--------------|-----|
-| `go.mod` | Module `github.com/tayjava/go-lab` (module mode, Go 1.22+) |
-| `main.go` | `package main` + `Hello, TayJava — Course lab` |
-| `.gitignore` | Ignore `bin/` and local artifacts |
-| `README.md` | How to clone and check out by lesson |
-| `guideline.md` | This file — read before editing code |
+| `cmd/zerodemo/main.go` | Runnable demo for variables, casts, zero values |
+| `guideline.md` | This file |
 
-Not yet: `cmd/`, `internal/`, HTTP, DB. Postgres schema (`db-ddl.sql`) starts at **lesson 22**.
+Root `main.go` from lesson 2 is unchanged (`go run .` still prints the Hello greeting).
+
+Not yet: functions package, structs, interfaces, DB. Postgres schema (`db-ddl.sql`) starts at **lesson 22**.
 
 ## Layout
 
 ```text
 tayjava-go-lab/
   go.mod
-  main.go          ← lesson 2 entrypoint (repo root)
+  main.go                 # lesson 2 entrypoint (kept)
+  cmd/zerodemo/main.go    # lesson 3 demo
   guideline.md
   README.md
-  .gitignore
-  bin/             ← created by go build (gitignored)
 ```
 
 ## Run
 
-Requires Go **1.22+** (`go version`).
-
 ```bash
-git checkout lesson-02
-go run .
+git checkout lesson-03
+go run ./cmd/zerodemo
 ```
 
-Expected:
+Expected (shape):
 
 ```text
-Hello, TayJava — Course lab
+course: Golang from zero seats: 25
+price zero value: 0
+remaining seats: 20
+seats=0 title="" published=false course=<nil>
 ```
 
-Build a binary:
+Also verify lesson 2 still works:
 
 ```bash
-go build -o bin/hello .
-./bin/hello
+go run .
 ```
 
 ## Try yourself
 
-1. Read `main.go`, change the printed string, run `go run .` again.
-2. Compare when files appear under `bin/` after `go build`.
-3. Commit experiments on your own branch (push optional).
+1. Change `capacity` / `enrolled` and re-run; watch the cast.
+2. Print zero values for `[]int` and `map[string]int` with `%#v`.
+3. Try assigning without conversion (`capacity - enrolled`) and read the compiler error.
 
 ## What the next lesson adds
 
-**Lesson 3** — variables, types, zero values: add a demo (e.g. `cmd/zerodemo`) on the same module; do not create a new repo.
+**Lesson 4** — functions, multiple return values, and scope: add `cmd/funcdemo` with `canEnroll` / `(T, error)` idioms.
