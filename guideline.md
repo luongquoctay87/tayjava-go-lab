@@ -1,42 +1,43 @@
-# Lesson 8 — Packages, modules, and export conventions
+# Lesson 9 — Idiomatic error handling (wrap, Is, As)
 
-Branch: `lesson-08`  
-Article: [Package, module (go.mod) và quy ước export](https://tayjava.com/vi/technologies/package-module-go-mod-va-quy-uoc-export)
+Branch: `lesson-09`  
+Article: [Error handling idiomatic trong Golang](https://tayjava.com/vi/technologies/error-handling-idiomatic-trong-golang)
 
 ## Goal of this branch
 
-Extract a real `course` package with exported constructors/getters and call it from `cmd/coursedemo`.
+Add sentinel `ErrNotFound`, wrap with `%w` in `Enroll`, and detect it with `errors.Is` from `cmd/errdemo`.
 
-## Changes vs `lesson-07`
+## Changes vs `lesson-08`
 
 | Add / change | Why |
 |--------------|-----|
-| `course/course.go` | Exported `Course`, `New`, `Level`; unexported `level` |
-| `cmd/coursedemo/main.go` | Import the package and print title + level |
+| `course/store.go` | `MemoryStore`, `CourseStore`, `ErrNotFound`, `Enroll` |
+| `cmd/errdemo/main.go` | Demo wrap + `errors.Is` |
 | `guideline.md` | This file |
 
 ## Run
 
 ```bash
-git checkout lesson-08
-go run ./cmd/coursedemo
+git checkout lesson-09
+go run ./cmd/errdemo
 go build ./...
 ```
 
-Expected:
+Expected (shape):
 
 ```text
-Golang from zero beginner
+enroll error: enroll user 42 into course 9: course: not found
+404-ish
+Is with %v wrap: false
+Is with %w wrap: true
 ```
-
-Try accessing `c.level` from `main` — the compiler rejects it; use `c.Level()`.
 
 ## Try yourself
 
-1. Add an unexported helper in `course/` and call it only from `New`.
-2. Sketch a `course/store.go` file in the same package (no import cycle).
-3. Confirm `go build ./...` still passes after edits.
+1. Temporarily change `Enroll` to wrap with `%v` and re-run — `errors.Is` fails.
+2. Add a `ValidationError` type and try `errors.As`.
+3. Save a course with ID 9 and confirm `Enroll` returns nil.
 
 ## What the next lesson adds
 
-**Lesson 9** — idiomatic errors: `ErrNotFound`, wrap with `%w`, `errors.Is` in `cmd/errdemo`.
+**Lesson 10** — table-driven tests with `go test` under `course/`.
