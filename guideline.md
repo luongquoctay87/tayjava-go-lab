@@ -1,62 +1,55 @@
-# Lesson 3 — Variables, types, and zero values
+# Lesson 4 — Functions, multiple return values, and scope
 
-Branch: `lesson-03`  
-Article: [Biến, kiểu dữ liệu và zero value trong Golang](https://tayjava.com/vi/technologies/bien-kieu-du-lieu-va-zero-value-trong-golang)
+Branch: `lesson-04`  
+Article: [Hàm, nhiều giá trị trả về và scope trong Golang](https://tayjava.com/vi/technologies/ham-nhieu-gia-tri-tra-ve-va-scope-trong-golang)
 
 ## Goal of this branch
 
-Practice `var` vs `:=`, numeric conversion, and zero values on a Course-domain demo — same module as lesson 2.
+Practice functions, `(T, error)`, pass-by-value, short-variable shadowing, and a first look at `defer`.
 
-## Changes vs `lesson-02`
+## Changes vs `lesson-03`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/zerodemo/main.go` | Runnable demo for variables, casts, zero values |
+| `cmd/funcdemo/main.go` | Demo helpers + exercise `canEnroll` |
 | `guideline.md` | This file |
 
-Root `main.go` from lesson 2 is unchanged (`go run .` still prints the Hello greeting).
-
-Not yet: functions package, structs, interfaces, DB. Postgres schema (`db-ddl.sql`) starts at **lesson 22**.
+Previous demos (`cmd/zerodemo`, root `main.go`) remain runnable.
 
 ## Layout
 
 ```text
-tayjava-go-lab/
-  go.mod
-  main.go                 # lesson 2 entrypoint (kept)
-  cmd/zerodemo/main.go    # lesson 3 demo
-  guideline.md
-  README.md
+cmd/
+  zerodemo/   # lesson 3
+  funcdemo/   # lesson 4
 ```
 
 ## Run
 
 ```bash
-git checkout lesson-03
-go run ./cmd/zerodemo
+git checkout lesson-04
+go run ./cmd/funcdemo
 ```
 
 Expected (shape):
 
 ```text
-course: Golang from zero seats: 25
-price zero value: 0
-remaining seats: 20
-seats=0 title="" published=false course=<nil>
-```
-
-Also verify lesson 2 still works:
-
-```bash
-go run .
+remaining: 20
+canEnroll(30, 5) => ok=true err=<nil>
+canEnroll(30, 40) => ok=false err=not enough seats
+canEnroll(30, 0) => ok=false err=request must be positive
+seats left after enroll: 25
+after bump (pass by value): 10
+enroll user 7 into course 101
+done
 ```
 
 ## Try yourself
 
-1. Change `capacity` / `enrolled` and re-run; watch the cast.
-2. Print zero values for `[]int` and `map[string]int` with `%#v`.
-3. Try assigning without conversion (`capacity - enrolled`) and read the compiler error.
+1. Change `canEnroll` error messages; re-run the three cases.
+2. Add a named-return variant of `enroll` and compare with the explicit returns.
+3. Observe that `bump` does not change the caller’s `n` (value semantics).
 
 ## What the next lesson adds
 
-**Lesson 4** — functions, multiple return values, and scope: add `cmd/funcdemo` with `canEnroll` / `(T, error)` idioms.
+**Lesson 5** — structs and methods (value vs pointer receivers): add `cmd/structdemo` with a `Course` type.
