@@ -87,6 +87,7 @@ docker compose up --build
 | `lesson-26` | 26 | Docker multi-stage Course API image |
 | `lesson-27` | 27 | Intermediate lab: Course REST + enrollment |
 | `lesson-28` | 28 | Notify worker pool + fan-in / fan-out |
+| `lesson-29` | 29 | errgroup pipeline + graceful HTTP shutdown |
 
 ## Conventions
 

@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -27,9 +30,8 @@ func main() {
 	defer db.Close()
 	log.Println("postgres ok")
 
-	// Pool uses Background so SIGTERM drain via Close still works (lesson 29).
+	// Pool lifetime ≠ signal ctx: drain via Close after HTTP Shutdown.
 	pool := notify.NewPool(context.Background(), 4, 64, notify.FakeSMTP)
-	defer pool.Close()
 
 	repo := course.NewPostgresRepo(db)
 	svc := course.NewService(repo)
@@ -38,14 +40,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
-
-	// Intermediate lab routes (lesson 27)
 	mux.HandleFunc("GET /courses/{id}", courses.Get)
 	mux.HandleFunc("POST /courses", courses.Create)
 	mux.HandleFunc("POST /courses/{id}/enrollments", enrollments.CreateNested)
 	mux.HandleFunc("GET /courses/{id}/enrollments", enrollments.List)
-
-	// Aliases kept from earlier lessons
 	mux.HandleFunc("GET /api/courses/{id}", courses.Get)
 	mux.HandleFunc("POST /api/courses", courses.Create)
 	mux.HandleFunc("POST /api/enrollments", enrollments.Create)
@@ -54,6 +52,26 @@ func main() {
 	h = api.Recovery(h)
 	h = api.Logging(h)
 
-	log.Printf("listening on %s", cfg.HTTPAddr)
-	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, h))
+	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: h}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		log.Printf("listening on %s", cfg.HTTPAddr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown: %v", err)
+	}
+	pool.Close()
+	log.Println("bye")
 }
