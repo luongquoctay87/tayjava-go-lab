@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/tayjava/go-lab/internal/api"
@@ -106,7 +109,7 @@ func TestEnrollmentCreate(t *testing.T) {
 			if tc.seats0 {
 				r.course.Seats = 0
 			}
-			h := api.NewEnrollmentHandler(course.NewService(r), nil)
+			h := api.NewEnrollmentHandler(course.NewService(r), nil, nil)
 
 			req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(tc.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -134,7 +137,7 @@ func TestEnrollmentCreate(t *testing.T) {
 func TestEnrollmentCreateNested(t *testing.T) {
 	repo := course.NewMemoryRepo()
 	svc := course.NewService(repo)
-	h := api.NewEnrollmentHandler(svc, nil)
+	h := api.NewEnrollmentHandler(svc, nil, nil)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /courses/{id}/enrollments", h.CreateNested)
@@ -169,7 +172,7 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	h := api.NewEnrollmentHandler(course.NewService(stubRepo{
 		course:   course.Course{ID: 1, Title: "Go", Seats: 1},
 		enrolled: make(map[string]struct{}),
-	}), nil)
+	}), nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -187,5 +190,48 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	}
 	if eb.Code != "INTERNAL" {
 		t.Fatalf("code=%q want INTERNAL", eb.Code)
+	}
+}
+
+func TestNoSeatsIsNotErrorLog(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	h := api.NewEnrollmentHandler(course.NewService(stubRepo{
+		course: course.Course{ID: 1, Title: "Go", Seats: 0},
+	}), nil, logger)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(`{"courseId":1,"userId":7}`))
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"reason":"no_seats"`) || !strings.Contains(out, `"level":"INFO"`) {
+		t.Fatalf("expected info no_seats, got %s", out)
+	}
+	if strings.Contains(out, `"level":"ERROR"`) {
+		t.Fatalf("no seats logged as error: %s", out)
+	}
+	if !strings.Contains(out, `"component":"enrollment"`) {
+		t.Fatalf("missing component: %s", out)
+	}
+}
+
+func TestSystemFailureIsErrorLog(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	h := api.NewEnrollmentHandler(course.NewService(stubRepo{
+		err: errors.New("db down"),
+	}), nil, logger)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(`{"courseId":1,"userId":7}`))
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(buf.String(), `"level":"ERROR"`) || !strings.Contains(buf.String(), "enrollment failed") {
+		t.Fatalf("expected error log, got %s", buf.String())
 	}
 }

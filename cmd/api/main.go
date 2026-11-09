@@ -21,7 +21,8 @@ import (
 )
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -41,7 +42,8 @@ func main() {
 	repo := course.NewPostgresRepo(db)
 	svc := course.NewService(repo)
 	courses := api.NewCourseHandler(svc, cfg.EnrollmentCapDefault)
-	enrollments := api.NewEnrollmentHandler(svc, pool)
+	// Child logger is built inside the constructor from this logger, after SetDefault.
+	enrollments := api.NewEnrollmentHandler(svc, pool, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)

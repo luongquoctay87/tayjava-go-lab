@@ -37,7 +37,7 @@ func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rid := r.Header.Get("X-Request-ID")
-		if rid == "" {
+		if !validRequestID(rid) {
 			rid = newRequestID()
 		}
 		ctx := context.WithValue(r.Context(), requestIDKey, rid)
@@ -67,6 +67,21 @@ func Recovery(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// validRequestID accepts a short id of letters, digits, '-' and '_'.
+// Anything else (empty, too long, spaces, control characters) is treated as missing.
+func validRequestID(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, c := range s {
+		ok := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_'
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func newRequestID() string {

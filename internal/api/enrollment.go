@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -15,12 +16,22 @@ import (
 type EnrollmentHandler struct {
 	svc    *course.Service
 	notify *notify.Pool
+	logger *slog.Logger
 }
 
 // NewEnrollmentHandler constructs an EnrollmentHandler.
 // notify may be nil (no post-enroll fan-out).
-func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool) EnrollmentHandler {
-	return EnrollmentHandler{svc: svc, notify: pool}
+// logger is the process logger created after slog.SetDefault; the child logger
+// with component=enrollment is built here, not in a package-level variable.
+func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool, logger *slog.Logger) EnrollmentHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return EnrollmentHandler{
+		svc:    svc,
+		notify: pool,
+		logger: logger.With("component", "enrollment"),
+	}
 }
 
 type enrollBody struct {
@@ -72,22 +83,14 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	slog.Info("enroll_attempt",
-		"request_id", RequestIDFrom(r.Context()),
-		"course_id", courseID,
-		"user_id", in.UserID,
-	)
+	h.logAttempt(r.Context(), courseID, in.UserID)
 	en, err := h.svc.Enroll(r.Context(), courseID, in.UserID)
 	if err != nil {
-		slog.Error("enroll_failed",
-			"request_id", RequestIDFrom(r.Context()),
-			"course_id", courseID,
-			"user_id", in.UserID,
-			"err", err.Error(),
-		)
+		h.logEnrollErr(r.Context(), courseID, in.UserID, err)
 		MapDomainError(w, err)
 		return
 	}
+	h.logEnrollOK(r.Context(), courseID, in.UserID)
 	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
 }
@@ -104,7 +107,7 @@ func (h EnrollmentHandler) List(w http.ResponseWriter, r *http.Request) {
 		MapDomainError(w, err)
 		return
 	}
-	slog.Info("list_enrollments",
+	h.logger.Info("list_enrollments",
 		"request_id", RequestIDFrom(r.Context()),
 		"course_id", courseID,
 		"count", len(list),
@@ -123,24 +126,60 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	slog.Info("enroll_attempt",
-		"request_id", RequestIDFrom(r.Context()),
-		"course_id", in.CourseID,
-		"user_id", in.UserID,
-	)
+	h.logAttempt(r.Context(), in.CourseID, in.UserID)
 	en, err := h.svc.Enroll(r.Context(), in.CourseID, in.UserID)
 	if err != nil {
-		slog.Error("enroll_failed",
-			"request_id", RequestIDFrom(r.Context()),
-			"course_id", in.CourseID,
-			"user_id", in.UserID,
-			"err", err.Error(),
-		)
+		h.logEnrollErr(r.Context(), in.CourseID, in.UserID, err)
 		MapDomainError(w, err)
 		return
 	}
+	h.logEnrollOK(r.Context(), in.CourseID, in.UserID)
 	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
+}
+
+func (h EnrollmentHandler) logAttempt(ctx context.Context, courseID, userID int64) {
+	h.logger.Info("enrollment attempt",
+		"request_id", RequestIDFrom(ctx),
+		"course_id", courseID,
+		"user_id", userID,
+	)
+}
+
+func (h EnrollmentHandler) logEnrollOK(ctx context.Context, courseID, userID int64) {
+	h.logger.Info("enrollment ok",
+		"request_id", RequestIDFrom(ctx),
+		"course_id", courseID,
+		"user_id", userID,
+	)
+}
+
+// logEnrollErr records business rejections at Info. Unexpected failures are Error.
+func (h EnrollmentHandler) logEnrollErr(ctx context.Context, courseID, userID int64, err error) {
+	rid := RequestIDFrom(ctx)
+	switch {
+	case errors.Is(err, course.ErrNoSeats):
+		h.logger.Info("enrollment rejected",
+			"request_id", rid,
+			"course_id", courseID,
+			"user_id", userID,
+			"reason", "no_seats",
+		)
+	case errors.Is(err, course.ErrConflict):
+		h.logger.Info("enrollment rejected",
+			"request_id", rid,
+			"course_id", courseID,
+			"user_id", userID,
+			"reason", "conflict",
+		)
+	default:
+		h.logger.Error("enrollment failed",
+			"request_id", rid,
+			"course_id", courseID,
+			"user_id", userID,
+			"err", err,
+		)
+	}
 }
 
 func (h EnrollmentHandler) submitNotify(r *http.Request, en course.Enrollment) {
