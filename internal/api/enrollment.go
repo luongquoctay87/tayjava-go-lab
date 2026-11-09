@@ -1,19 +1,24 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
-
-	"github.com/tayjava/go-lab/internal/course"
 )
+
+// Enroller is the part of the service the handler needs.
+// *course.Service satisfies it, and tests can pass a smaller fake.
+type Enroller interface {
+	Enroll(ctx context.Context, courseID, userID int64) error
+}
 
 // EnrollmentHandler exposes enrollment HTTP endpoints.
 type EnrollmentHandler struct {
-	svc *course.Service
+	svc Enroller
 }
 
 // NewEnrollmentHandler constructs an EnrollmentHandler.
-func NewEnrollmentHandler(svc *course.Service) EnrollmentHandler {
+func NewEnrollmentHandler(svc Enroller) EnrollmentHandler {
 	return EnrollmentHandler{svc: svc}
 }
 

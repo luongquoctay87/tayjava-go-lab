@@ -31,7 +31,7 @@ Validate JSON at the HTTP edge (`DisallowUnknownFields` + simple rules) and map 
 | Input | `courseId: 0`, bad JSON | 400 `VALIDATION` |
 | Business | no seats / already enrolled | 409 `NO_SEATS` / `CONFLICT` |
 | Missing | unknown course | 404 `NOT_FOUND` |
-| System | unexpected | 500 `INTERNAL` (log detail server-side) |
+| System | unexpected | 500 `INTERNAL` (`slog.Error` logs the original error; client sees `INTERNAL` only) |
 
 ## Layout
 
@@ -61,10 +61,11 @@ curl -i -d '{"courseId":1,"userId":7}' -H 'Content-Type: application/json' \
 # enroll until seats=0 → 409 NO_SEATS
 ```
 
-Apply schema when using Postgres:
+Apply schema when using Postgres (same SQL as lesson 22):
 
 ```bash
-psql "$DATABASE_URL" -f db-ddl.sql
+migrate -path migrations -database "$DATABASE_URL" up
+# or: psql "$DATABASE_URL" -f db-ddl.sql
 ```
 
 ## Try yourself

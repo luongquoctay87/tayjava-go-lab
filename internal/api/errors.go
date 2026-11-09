@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/tayjava/go-lab/internal/course"
@@ -40,7 +40,8 @@ func MapDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, course.ErrConflict):
 		WriteError(w, http.StatusConflict, "CONFLICT", err.Error())
 	default:
-		log.Printf("internal error: %v", err)
+		// Log the original error server-side; do not leak internal details to the client.
+		slog.Error("unhandled error", "err", err)
 		WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")
 	}
 }
