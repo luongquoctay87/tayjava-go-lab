@@ -98,6 +98,8 @@ docker compose up --build
 | `lesson-37` | 37 | gRPC vs REST checklist (light demo) |
 | `lesson-38` | 38 | Enroll transaction + 3s deadline (`seats`) |
 | `lesson-39` | 39 | Advanced: async enroll worker + metrics |
+| `lesson-40` | 40 | Package boundaries + compatibility ADR |
+| `lesson-42` | 42 | Go vs JVM/Node + `cmd/worker` (skips 41) |
 
 ## Conventions
 

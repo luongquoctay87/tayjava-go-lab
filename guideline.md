@@ -1,46 +1,43 @@
-# Lesson 39 — Advanced lab: API + enrollment worker + metrics
+# Lesson 40 — Package design and backward compatibility
 
-Branch: `lesson-39`  
-Article: [Advanced Golang lab: API + enrollment worker + metrics](https://tayjava.com/vi/technologies/advanced-golang-lab-api-enrollment-worker-metrics)
+Branch: `lesson-40`  
+Article: [Golang package design and backward compatibility](https://tayjava.com/vi/technologies/golang-package-design-and-backward-compatibility)
 
 ## Goal of this branch
 
-Wire one binary: HTTP validates + enqueues (`202` / `503`) → bounded worker pool → seat write via lesson-38 transactions → backlog metrics. Ordered shutdown: HTTP `Shutdown` → close queue → drain workers.
+Tighten package boundaries: keep SQL/HTTP under `internal`, document exported symbols, add an additive JSON field (`subtitle`), and record why enrollment is not a separate module yet.
 
-## Changes vs `lesson-38`
+## Changes vs `lesson-39`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/enrollment` | Enroller, async handler, metrics, tests |
-| `cmd/api/main.go` | Async `POST /api/enrollments` + worker drain |
-| `GET /metrics` | Advanced enroll counters / queue depth |
-| `README.md` / `guideline.md` | This lesson |
+| `docs/adr-001-enrollment-module.md` | Short ADR: stay mono-module |
+| `internal/course/model.go` | Additive `subtitle` JSON field |
+| `README.md` / `guideline.md` | Export inventory + this lesson |
 
-`db-ddl.sql` unchanged. Sync nested enroll (`POST /courses/{id}/enrollments`) still exists for Intermediate curls.
+`db-ddl.sql` unchanged (subtitle is API-only for now; persistence can ignore omitempty).
+
+## Export inventory (who imports?)
+
+| Symbol / package | Importers |
+|------------------|-----------|
+| `course` (root) | Early demos (`cmd/coursedemo`, benches) |
+| `internal/course` | `cmd/api`, `internal/api`, `internal/enrollment` |
+| `internal/enrollment` | `cmd/api` only |
+| `internal/auth` | `cmd/api` |
+| `internal/notify` | `cmd/api`, `internal/api` |
+
+Rule of thumb: prefer `internal/` for anything with SQL or HTTP wiring.
 
 ## Run
 
 ```bash
-git checkout lesson-39
-go test -race ./internal/enrollment/...
+git checkout lesson-40
 go test ./...
-go build -o bin/api ./cmd/api
+go build ./...
+cat docs/adr-001-enrollment-module.md
 ```
 
-Async enroll (JWT required):
+## Skipped next
 
-```bash
-TOKEN=$(curl -s -d '{"userId":"7","password":"lab"}' -H 'Content-Type: application/json' localhost:8080/login | jq -r .token)
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -d '{"courseId":1,"userId":7}' \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Idempotency-Key: abc' \
-  -H 'Content-Type: application/json' \
-  localhost:8080/api/enrollments
-# 202
-curl -s localhost:8080/metrics
-```
-
-## What the next lesson adds
-
-**Lesson 40** — package design / `internal` boundaries / short compatibility ADR.
+**Lesson 41** (system design ADR / peak enrollment) is documentation-heavy; skipped in this lab path — see article for the sync/async brief. Continue to **lesson 42** (`cmd/worker` + Go vs JVM vs Node ADR).
