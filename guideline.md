@@ -17,7 +17,7 @@ Lần đầu có **module lab** chạy được: in lời chào, hiểu `go run`
 | `README.md` | Cách clone và checkout theo bài |
 | `guideline.md` | File này — đọc trước khi sửa code |
 
-Chưa có: `cmd/`, `internal/`, HTTP, DB. Các bài sau sẽ nâng dần trên cùng module.
+Chưa có: `cmd/`, `internal/`, HTTP, DB. Schema Postgres (`db-ddl.sql`) sẽ có từ **bài 22**.
 
 ## Cấu trúc hiện tại
 
