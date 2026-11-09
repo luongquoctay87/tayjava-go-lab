@@ -1,5 +1,5 @@
 -- TayJava Go lab — Postgres schema for Course + Enrollment (lesson 22+)
--- Column name is `seats` (available capacity), not seats_left.
+-- Column name is `seats` (total capacity; not seats_left).
 -- Apply: psql "$DATABASE_URL" -f db-ddl.sql
 
 CREATE TABLE IF NOT EXISTS courses (
