@@ -3,11 +3,13 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/tayjava/go-lab/internal/api"
 	"github.com/tayjava/go-lab/internal/course"
@@ -203,5 +205,38 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	}
 	if eb.Code != "INTERNAL" {
 		t.Fatalf("code=%q want INTERNAL", eb.Code)
+	}
+}
+
+// txDoneRepo mimics Commit after a deadline: the error is sql.ErrTxDone, not context.DeadlineExceeded.
+type txDoneRepo struct{ stubRepo }
+
+func (txDoneRepo) EnrollTx(context.Context, int64, int64) (course.Enrollment, error) {
+	return course.Enrollment{}, sql.ErrTxDone
+}
+
+func TestEnrollDeadlineReturns503WhenCommitIsTxDone(t *testing.T) {
+	h := api.NewEnrollmentHandler(course.NewService(txDoneRepo{}), nil, nil, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+	time.Sleep(5 * time.Millisecond)
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/enrollments",
+		bytes.NewBufferString(`{"courseId":1,"userId":7}`))
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Retry-After") != "1" {
+		t.Fatalf("Retry-After=%q", rec.Header().Get("Retry-After"))
+	}
+	var eb api.ErrorBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &eb); err != nil {
+		t.Fatal(err)
+	}
+	if eb.Code != "TIMEOUT" {
+		t.Fatalf("code=%q", eb.Code)
 	}
 }

@@ -120,6 +120,8 @@ RETURNING id, course_id, user_id`, courseID, userID).Scan(&e.ID, &e.CourseID, &e
 		return Enrollment{}, err
 	}
 	if err := tx.Commit(); err != nil {
+		// Deadline just before Commit: database/sql has already rolled back and
+		// returns sql.ErrTxDone. The handler maps that via ctx.Err(), not this error.
 		return Enrollment{}, err
 	}
 	return e, nil
