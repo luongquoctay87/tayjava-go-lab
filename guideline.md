@@ -1,34 +1,37 @@
-# Lesson 29 — errgroup, pipelines, and graceful shutdown
+# Lesson 30 — Data races and go test -race
 
-Branch: `lesson-29`  
-Article: [errgroup, pipelines, and graceful shutdown in Golang](https://tayjava.com/vi/technologies/errgroup-pipelines-and-graceful-shutdown-in-golang)
+Branch: `lesson-30`  
+Article: [Data races and go test -race in Golang](https://tayjava.com/vi/technologies/data-races-and-go-test-race-in-golang)
 
 ## Goal of this branch
 
-Wire `errgroup` for a 3-stage export pipeline and graceful HTTP shutdown: signal → `Server.Shutdown` → `pool.Close()` drain. Pool still uses `context.Background()` so workers do not exit before the queue drains.
+Show a shared Course cache race and the mutex fix. Make `-race` part of the lab habit for concurrent packages.
 
-## Changes vs `lesson-28`
+## Changes vs `lesson-29`
 
 | Add / change | Why |
 |--------------|-----|
-| `internal/export` | errgroup pipeline demo + tests |
-| `cmd/api/main.go` | `signal.NotifyContext` + `Shutdown` + `pool.Close` |
-| `go.mod` | `golang.org/x/sync` |
+| `internal/coursecache` | Unsafe vs Safe cache + concurrent test |
+| `unsafe_race_test.go` | Build-tag demo that fails under `-race` |
 | `README.md` / `guideline.md` | This lesson |
 
-`db-ddl.sql` unchanged (`seats` = total capacity).
+`db-ddl.sql` unchanged.
 
 ## Run
 
 ```bash
-git checkout lesson-29
-go test ./internal/export/...
-go test ./...
-go build -o bin/api ./cmd/api
+git checkout lesson-30
+go test -race ./internal/coursecache/...
+go test -race ./internal/notify/... ./internal/export/...
+go build ./...
 ```
 
-Shutdown smoke: start the API, enroll a few users, then Ctrl+C — expect “shutting down…” then “bye” without a hung process.
+Deliberate race (expect FAIL):
+
+```bash
+go test -race -tags=racedemo ./internal/coursecache -run TestUnsafeCacheRace -count=1
+```
 
 ## What the next lesson adds
 
-**Lesson 30** — data races and `go test -race` on a shared cache demo.
+**Lesson 31** — generics helpers (`Unique` / `First`) where they pay off.

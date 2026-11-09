@@ -88,6 +88,7 @@ docker compose up --build
 | `lesson-27` | 27 | Intermediate lab: Course REST + enrollment |
 | `lesson-28` | 28 | Notify worker pool + fan-in / fan-out |
 | `lesson-29` | 29 | errgroup pipeline + graceful HTTP shutdown |
+| `lesson-30` | 30 | Race detector: unsafe vs safe course cache |
 
 ## Conventions
 
