@@ -189,8 +189,9 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/enrollments",
+	req := httptest.NewRequest(http.MethodPost, "/api/enrollments",
 		bytes.NewBufferString(`{"courseId":1,"userId":7}`))
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
