@@ -1,48 +1,42 @@
-# Lesson 7 — Slices and maps
+# Lesson 8 — Packages, modules, and export conventions
 
-Branch: `lesson-07`  
-Article: [Slice và map trong Golang](https://tayjava.com/vi/technologies/slice-va-map-trong-golang)
+Branch: `lesson-08`  
+Article: [Package, module (go.mod) và quy ước export](https://tayjava.com/vi/technologies/package-module-go-mod-va-quy-uoc-export)
 
 ## Goal of this branch
 
-Build Course lists with slices, index them with maps, and see why a nil map panics on write.
+Extract a real `course` package with exported constructors/getters and call it from `cmd/coursedemo`.
 
-## Changes vs `lesson-06`
+## Changes vs `lesson-07`
 
 | Add / change | Why |
 |--------------|-----|
-| `cmd/collections/main.go` | Slice/map demos + Course index exercise |
+| `course/course.go` | Exported `Course`, `New`, `Level`; unexported `level` |
+| `cmd/coursedemo/main.go` | Import the package and print title + level |
 | `guideline.md` | This file |
 
 ## Run
 
 ```bash
-git checkout lesson-07
-go run ./cmd/collections
+git checkout lesson-08
+go run ./cmd/coursedemo
+go build ./...
 ```
 
-Expected (shape):
+Expected:
 
 ```text
-3 Golang
-[101 102] 2 8
-nil slice: true empty slice: false
-len: 3 cap: ...
-lookup 2: {ID:2 Title:Java Seats:15} ok=true
-nil map write panicked (expected): assignment to entry in nil map
-fixed map len: 1
-enrolled course: 101
-not enrolled
+Golang from zero beginner
 ```
 
-(`cap` after `append` may be 3 or larger depending on growth.)
+Try accessing `c.level` from `main` — the compiler rejects it; use `c.Level()`.
 
 ## Try yourself
 
-1. Remove the `recover` in `demoNilMapPanic` and watch the process crash.
-2. Always initialize maps with `make` or a literal before writing.
-3. Compare `var s []Course` vs `s := []Course{}` for JSON / `nil` checks later.
+1. Add an unexported helper in `course/` and call it only from `New`.
+2. Sketch a `course/store.go` file in the same package (no import cycle).
+3. Confirm `go build ./...` still passes after edits.
 
 ## What the next lesson adds
 
-**Lesson 8** — packages, modules, and export: extract a real `course` package + `cmd/coursedemo`.
+**Lesson 9** — idiomatic errors: `ErrNotFound`, wrap with `%w`, `errors.Is` in `cmd/errdemo`.
