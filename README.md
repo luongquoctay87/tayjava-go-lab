@@ -22,7 +22,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-13   # or lesson-02 … lesson-12
+git checkout lesson-14   # or lesson-02 … lesson-13
 cat guideline.md         # read before you edit
 ```
 
@@ -40,6 +40,13 @@ Lesson 13 Course CLI:
 git checkout lesson-13
 go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
+```
+
+Lesson 14 goroutines:
+
+```bash
+git checkout lesson-14
+go run ./cmd/goroutine-lab
 ```
 
 ## How to learn with this repo
@@ -69,8 +76,9 @@ go run ./cmd/course-cli list
 | `lesson-11` | 11 | Pointers (`cmd/ptrdemo`) |
 | `lesson-12` | 12 | defer / panic / recover (`cmd/deferdemo`) |
 | `lesson-13` | 13 | Course CLI + JSON (`cmd/course-cli`, `internal/course`) |
+| `lesson-14` | 14 | Goroutines (`cmd/goroutine-lab`) |
 
-Later branches continue the series (concurrency → REST API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
+Later branches continue the series (channels → REST API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
 
 ## Conventions
 
@@ -80,7 +88,7 @@ Later branches continue the series (concurrency → REST API → worker). Postgr
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Layout (lesson 13)
+## Layout (lesson 14)
 
 ```text
 tayjava-go-lab/
@@ -92,7 +100,8 @@ tayjava-go-lab/
 ├── internal/course/       # lesson 13 CLI domain
 ├── cmd/
 │   ├── zerodemo/ … deferdemo/
-│   └── course-cli/        # beginner lab CLI
+│   ├── course-cli/        # beginner lab CLI
+│   └── goroutine-lab/     # lesson 14 concurrency
 ├── data/                  # courses.json (gitignored)
 └── bin/                   # local build (gitignored)
 ```
@@ -105,9 +114,10 @@ tayjava-go-lab/
 go version
 go run .
 go run ./cmd/course-cli list
+go run ./cmd/goroutine-lab
 go test ./...
 git branch -a
-git checkout lesson-13
+git checkout lesson-14
 ```
 
 ## Series & support
