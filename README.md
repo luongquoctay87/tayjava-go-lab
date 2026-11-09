@@ -22,7 +22,7 @@ One Go module across the whole path — e-learning domain (`Course`, `Enrollment
 ```bash
 git clone https://github.com/luongquoctay87/tayjava-go-lab.git
 cd tayjava-go-lab
-git checkout lesson-16   # or lesson-02 … lesson-15
+git checkout lesson-17   # or lesson-02 … lesson-16
 cat guideline.md         # read before you edit
 ```
 
@@ -42,13 +42,13 @@ go run ./cmd/course-cli add -id 1 -title "Golang from zero" -seats 30
 go run ./cmd/course-cli list
 ```
 
-Concurrency demos (14–16):
+Concurrency demos (14–17):
 
 ```bash
-git checkout lesson-16
-go run ./cmd/goroutine-lab
-go run ./cmd/channel-lab
+git checkout lesson-17
 go run ./cmd/select-lab
+go test -race ./internal/seatledger
+go run ./cmd/synclab
 ```
 
 ## How to learn with this repo
@@ -81,8 +81,9 @@ go run ./cmd/select-lab
 | `lesson-14` | 14 | Goroutines (`cmd/goroutine-lab`) |
 | `lesson-15` | 15 | Channels (`cmd/channel-lab`) |
 | `lesson-16` | 16 | select / buffered / close (`cmd/select-lab`) |
+| `lesson-17` | 17 | WaitGroup + Mutex (`internal/seatledger`, `cmd/synclab`) |
 
-Later branches continue the series (WaitGroup/Mutex → REST API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
+Later branches continue the series (context → REST API → worker). Postgres schema (`db-ddl.sql`) from **lesson 22**.
 
 ## Conventions
 
@@ -92,24 +93,24 @@ Later branches continue the series (WaitGroup/Mutex → REST API → worker). Po
 - **English only** in `.go` files, comments, commit-facing docs in this repo, and SQL comments.
 - Postgres schema **`db-ddl.sql`**: introduced from **`lesson-22` onward** (Course / Enrollment); earlier branches do not include it.
 
-## Layout (lesson 16)
+## Layout (lesson 17)
 
 ```text
 tayjava-go-lab/
 ├── README.md
-├── guideline.md           # per-branch
+├── guideline.md
 ├── go.mod
-├── main.go                # lesson 2 entrypoint (kept)
-├── course/                # lessons 8–11 package demos
-├── internal/course/       # lesson 13 CLI domain
+├── main.go
+├── course/
+├── internal/
+│   ├── course/            # CLI JSON store
+│   └── seatledger/        # lesson 17 Mutex ledger
 ├── cmd/
-│   ├── zerodemo/ … deferdemo/
-│   ├── course-cli/        # beginner lab CLI
-│   ├── goroutine-lab/     # lesson 14
-│   ├── channel-lab/       # lesson 15
-│   └── select-lab/        # lesson 16
-├── data/                  # courses.json (gitignored)
-└── bin/                   # local build (gitignored)
+│   ├── course-cli/
+│   ├── goroutine-lab/ … select-lab/
+│   └── synclab/           # lesson 17 demo
+├── data/
+└── bin/
 ```
 
 `db-ddl.sql` appears from lesson 22.
@@ -123,9 +124,11 @@ go run ./cmd/course-cli list
 go run ./cmd/goroutine-lab
 go run ./cmd/channel-lab
 go run ./cmd/select-lab
+go run ./cmd/synclab
+go test -race ./internal/seatledger
 go test ./...
 git branch -a
-git checkout lesson-16
+git checkout lesson-17
 ```
 
 ## Series & support
