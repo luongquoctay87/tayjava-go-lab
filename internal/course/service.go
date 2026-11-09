@@ -17,13 +17,12 @@ var (
 
 // Service holds Course use-cases. It does not import net/http.
 type Service struct {
-	repo     Repository
-	enrolled map[string]struct{}
+	repo Repository
 }
 
 // NewService wires a repository implementation.
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo, enrolled: make(map[string]struct{})}
+	return &Service{repo: repo}
 }
 
 // GetCourse loads a course by id.
@@ -43,21 +42,12 @@ func (s *Service) CreateCourse(ctx context.Context, c Course) (Course, error) {
 	return s.repo.Save(ctx, c)
 }
 
-// Enroll reserves one seat for userID on courseID.
+// Enroll checks that the course exists, then lets the repository take the seat.
+// Seat checks and the enrollment record stay inside the repo so two requests
+// cannot both take the last seat.
 func (s *Service) Enroll(ctx context.Context, courseID, userID int64) error {
-	c, err := s.repo.Get(ctx, courseID)
-	if err != nil {
+	if _, err := s.repo.Get(ctx, courseID); err != nil {
 		return err
 	}
-	if c.Seats <= 0 {
-		return ErrNoSeats
-	}
-	key := fmt.Sprintf("%d:%d", courseID, userID)
-	if _, ok := s.enrolled[key]; ok {
-		return ErrConflict
-	}
-	s.enrolled[key] = struct{}{}
-	c.Seats--
-	_, err = s.repo.Save(ctx, c)
-	return err
+	return s.repo.Enroll(ctx, courseID, userID)
 }

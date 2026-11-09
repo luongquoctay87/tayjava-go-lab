@@ -46,7 +46,7 @@ Lesson 21 layered API:
 
 ```bash
 git checkout lesson-21
-go test ./internal/course ./internal/api
+go test -race ./...
 go run ./cmd/api
 # curl http://localhost:8080/api/courses/1
 ```
