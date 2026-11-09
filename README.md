@@ -86,6 +86,7 @@ docker compose up --build
 | `lesson-25` | 25 | Env config / twelve-factor light |
 | `lesson-26` | 26 | Docker multi-stage Course API image |
 | `lesson-27` | 27 | Intermediate lab: Course REST + enrollment |
+| `lesson-28` | 28 | Notify worker pool + fan-in / fan-out |
 
 ## Conventions
 

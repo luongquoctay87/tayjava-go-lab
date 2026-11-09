@@ -106,7 +106,7 @@ func TestEnrollmentCreate(t *testing.T) {
 			if tc.seats0 {
 				r.course.Seats = 0
 			}
-			h := api.NewEnrollmentHandler(course.NewService(r))
+			h := api.NewEnrollmentHandler(course.NewService(r), nil)
 
 			req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(tc.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -134,7 +134,7 @@ func TestEnrollmentCreate(t *testing.T) {
 func TestEnrollmentCreateNested(t *testing.T) {
 	repo := course.NewMemoryRepo()
 	svc := course.NewService(repo)
-	h := api.NewEnrollmentHandler(svc)
+	h := api.NewEnrollmentHandler(svc, nil)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /courses/{id}/enrollments", h.CreateNested)
@@ -169,7 +169,7 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	h := api.NewEnrollmentHandler(course.NewService(stubRepo{
 		course:   course.Course{ID: 1, Title: "Go", Seats: 1},
 		enrolled: make(map[string]struct{}),
-	}))
+	}), nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 

@@ -1,21 +1,25 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/tayjava/go-lab/internal/course"
+	"github.com/tayjava/go-lab/internal/notify"
 )
 
 // EnrollmentHandler exposes enrollment HTTP endpoints.
 type EnrollmentHandler struct {
-	svc *course.Service
+	svc    *course.Service
+	notify *notify.Pool
 }
 
 // NewEnrollmentHandler constructs an EnrollmentHandler.
-func NewEnrollmentHandler(svc *course.Service) EnrollmentHandler {
-	return EnrollmentHandler{svc: svc}
+// notify may be nil (no post-enroll fan-out).
+func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool) EnrollmentHandler {
+	return EnrollmentHandler{svc: svc, notify: pool}
 }
 
 type enrollBody struct {
@@ -72,6 +76,7 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		MapDomainError(w, err)
 		return
 	}
+	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
 }
 
@@ -106,5 +111,18 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		MapDomainError(w, err)
 		return
 	}
+	h.submitNotify(r, en)
 	WriteJSON(w, http.StatusCreated, en)
+}
+
+func (h EnrollmentHandler) submitNotify(r *http.Request, en course.Enrollment) {
+	if h.notify == nil {
+		return
+	}
+	// Use Background so client cancel does not drop accepted notify work.
+	_ = h.notify.Submit(context.Background(), notify.Job{
+		CourseID: en.CourseID,
+		UserID:   en.UserID,
+	})
+	_ = r
 }

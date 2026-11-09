@@ -1,95 +1,48 @@
-# Lesson 27 — Intermediate lab: Course REST + enrollment
+# Lesson 28 — Worker pools and fan-in / fan-out
 
-Branch: `lesson-27`  
-Article: [Lab Intermediate: Course REST API + enrollment bằng Golang](https://tayjava.com/vi/technologies/lab-intermediate-course-rest-api-enrollment-bang-golang)
+Branch: `lesson-28`  
+Article: [Worker pools and fan-in / fan-out in Golang](https://tayjava.com/vi/technologies/worker-pools-and-fan-in-fan-out-in-golang)
 
 ## Goal of this branch
 
-Compose lessons 19–26 into an end-to-end Intermediate lab: Course REST + enrollment capped by **`seats`** (total capacity, not `seats_left`), Postgres persistence, env config, multi-stage Docker image, and `docker compose` with schema init from `db-ddl.sql`.
+Add a bounded notify worker pool after successful enrollment. Cap goroutines (workers=4, queue=64); demonstrate fan-in aggregation; keep `db-ddl.sql` unchanged.
 
-## Changes vs `lesson-26`
+## Changes vs `lesson-27`
 
 | Add / change | Why |
 |--------------|-----|
-| `docker-compose.yml` | API + Postgres; DDL via init volume |
-| `internal/course/*` | Enrollment persistence; seats = capacity |
-| `internal/api/enrollment.go` | Nested `/courses/{id}/enrollments` |
-| `cmd/api/main.go` | Intermediate routes + DB retry for Compose |
+| `internal/notify` | Fixed-size pool + `FanIn` helper + tests |
+| `internal/api/enrollment.go` | Submit notify job after successful Enroll |
+| `cmd/api/main.go` | Wire pool; `defer pool.Close()` |
 | `README.md` / `guideline.md` | This lesson |
 
-## Seats semantics
+## Seats / schema
 
-Column / JSON field remains **`seats`**. From this lesson it means **total capacity**. Enrollment rows are counted separately; when `count >= seats` the API returns `409 NO_SEATS`. Do not rename to `seats_left` / `capacity` in this lab.
-
-Apply DDL (Compose does this on first `db` boot):
-
-```bash
-psql "$DATABASE_URL" -f db-ddl.sql
-```
-
-## Endpoints
-
-| Method | Path | Notes |
-|--------|------|-------|
-| `GET` | `/healthz` | Liveness |
-| `POST` | `/courses` | Create (`title`, `seats`, optional `level`) |
-| `GET` | `/courses/{id}` | Detail |
-| `POST` | `/courses/{id}/enrollments` | Body `{"userId":…}` |
-| `GET` | `/courses/{id}/enrollments` | List |
-| `POST` | `/api/courses`, `/api/enrollments` | Aliases from earlier lessons |
-
-## Layout
-
-```text
-Dockerfile
-docker-compose.yml
-db-ddl.sql
-.env.example
-cmd/api/main.go
-internal/config/
-internal/course/
-internal/api/
-```
+`db-ddl.sql` is unchanged. Column **`seats`** remains total capacity.
 
 ## Run
 
-Unit tests (no Docker / DB required):
-
 ```bash
-git checkout lesson-27
+git checkout lesson-28
+go test ./internal/notify/...
 go test ./...
 go build -o bin/api ./cmd/api
 ```
 
-Compose end-to-end:
+With Compose (from lesson 27):
 
 ```bash
 docker compose up --build
+# enroll — watch fake SMTP logs: enrolled user=… course=…
 ```
 
-Sample curls (another terminal):
+## Leak / race checklist
 
-```bash
-curl -s -d '{"title":"Go Intermediate","seats":2}' -H 'Content-Type: application/json' \
-  http://localhost:8080/courses
-curl -s -d '{"userId":7}' -H 'Content-Type: application/json' \
-  http://localhost:8080/courses/1/enrollments
-curl -s -d '{"userId":8}' -H 'Content-Type: application/json' \
-  http://localhost:8080/courses/1/enrollments
-curl -s -d '{"userId":9}' -H 'Content-Type: application/json' \
-  http://localhost:8080/courses/1/enrollments
-# expect 409 NO_SEATS
-curl -s http://localhost:8080/courses/1/enrollments
-```
-
-Without Compose, export `DATABASE_URL`, apply `db-ddl.sql`, then `go run ./cmd/api`.
-
-## Try yourself
-
-1. Enroll the same `userId` twice — expect `409 CONFLICT`.
-2. Note concurrent enroll races (no `SELECT … FOR UPDATE` yet) — Advanced lessons dig in.
-3. Confirm `.env` stays gitignored; only `.env.example` is committed.
+- Workers honor cancel or exit when jobs channel closes.
+- Only one place closes the jobs channel (`Close`).
+- Do not share unsynchronized maps across workers — run `go test -race ./internal/notify/...`.
+- Notify uses `context.Background()` so client cancel does not drop accepted work.
 
 ## What the next lesson adds
 
-**Lesson 28** — worker pool and fan-in / fan-out for parallel enroll/notify work.
+**Lesson 29** — `errgroup`, pipelines, and graceful HTTP shutdown (`Server.Shutdown` then `pool.Close`).

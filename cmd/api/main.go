@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/tayjava/go-lab/internal/api"
 	"github.com/tayjava/go-lab/internal/config"
 	"github.com/tayjava/go-lab/internal/course"
+	"github.com/tayjava/go-lab/internal/notify"
 )
 
 func main() {
@@ -25,10 +27,14 @@ func main() {
 	defer db.Close()
 	log.Println("postgres ok")
 
+	// Pool uses Background so SIGTERM drain via Close still works (lesson 29).
+	pool := notify.NewPool(context.Background(), 4, 64, notify.FakeSMTP)
+	defer pool.Close()
+
 	repo := course.NewPostgresRepo(db)
 	svc := course.NewService(repo)
 	courses := api.NewCourseHandler(svc, cfg.EnrollmentCapDefault)
-	enrollments := api.NewEnrollmentHandler(svc)
+	enrollments := api.NewEnrollmentHandler(svc, pool)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)
