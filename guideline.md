@@ -38,10 +38,11 @@ docker compose up --build
 
 ## Leak / race checklist
 
-- Workers honor cancel or exit when jobs channel closes.
-- Only one place closes the jobs channel (`Close`).
+- `Submit` returns an error: `ErrClosed` after `Close`, or `ctx.Err()` if the queue wait times out. It does not panic on a closed channel.
+- `Close` stops new jobs and drains the queue. Canceling the pool context drops jobs still queued.
+- The enroll handler waits at most 100ms for a queue slot. Once queued, the pool context owns the job.
+- Only one place closes the jobs channel (`Close`, via `sync.Once`).
 - Do not share unsynchronized maps across workers — run `go test -race ./internal/notify/...`.
-- Notify uses `context.Background()` so client cancel does not drop accepted work.
 
 ## What the next lesson adds
 

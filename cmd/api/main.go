@@ -27,7 +27,8 @@ func main() {
 	defer db.Close()
 	log.Println("postgres ok")
 
-	// Pool uses Background so SIGTERM drain via Close still works (lesson 29).
+	// This process has no signal context yet. Background stays active until exit,
+	// so Close drains the queue. Canceling the pool context would drop queued jobs.
 	pool := notify.NewPool(context.Background(), 4, 64, notify.FakeSMTP)
 	defer pool.Close()
 

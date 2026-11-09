@@ -3,8 +3,10 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/tayjava/go-lab/internal/course"
 	"github.com/tayjava/go-lab/internal/notify"
@@ -119,10 +121,15 @@ func (h EnrollmentHandler) submitNotify(r *http.Request, en course.Enrollment) {
 	if h.notify == nil {
 		return
 	}
-	// Use Background so client cancel does not drop accepted notify work.
-	_ = h.notify.Submit(context.Background(), notify.Job{
+	// The timeout only bounds the wait for a queue slot. Once queued, workers
+	// run the job with the pool context, so a later client disconnect does not
+	// drop it.
+	ctx, cancel := context.WithTimeout(r.Context(), 100*time.Millisecond)
+	defer cancel()
+	if err := h.notify.Submit(ctx, notify.Job{
 		CourseID: en.CourseID,
 		UserID:   en.UserID,
-	})
-	_ = r
+	}); err != nil {
+		log.Printf("notify skipped course=%d user=%d: %v", en.CourseID, en.UserID, err)
+	}
 }

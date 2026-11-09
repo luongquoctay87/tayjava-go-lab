@@ -2,6 +2,8 @@ package notify
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,8 +20,8 @@ func TestPoolProcessesAllJobs(t *testing.T) {
 
 	const n = 100
 	for i := 0; i < n; i++ {
-		if !p.Submit(ctx, Job{CourseID: 1, UserID: int64(i)}) {
-			t.Fatalf("submit %d rejected", i)
+		if err := p.Submit(ctx, Job{CourseID: 1, UserID: int64(i)}); err != nil {
+			t.Fatalf("submit %d: %v", i, err)
 		}
 	}
 	p.Close()
@@ -42,8 +44,8 @@ func TestPoolStopsOnCancel(t *testing.T) {
 		return c.Err()
 	})
 
-	if !p.Submit(context.Background(), Job{CourseID: 1, UserID: 1}) {
-		t.Fatal("submit failed")
+	if err := p.Submit(context.Background(), Job{CourseID: 1, UserID: 1}); err != nil {
+		t.Fatal(err)
 	}
 	select {
 	case <-started:
@@ -61,6 +63,72 @@ func TestPoolStopsOnCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Close hung after cancel")
+	}
+}
+
+func TestSubmitAfterClose(t *testing.T) {
+	p := NewPool(context.Background(), 2, 4, func(context.Context, Job) error { return nil })
+	p.Close()
+	err := p.Submit(context.Background(), Job{CourseID: 1, UserID: 1})
+	if !errors.Is(err, ErrClosed) {
+		t.Fatalf("got %v want ErrClosed", err)
+	}
+}
+
+func TestSubmitConcurrentWithClose(t *testing.T) {
+	p := NewPool(context.Background(), 2, 1, func(context.Context, Job) error {
+		time.Sleep(2 * time.Millisecond)
+		return nil
+	})
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_ = p.Submit(ctx, Job{UserID: int64(id)})
+		}(i)
+	}
+	time.Sleep(5 * time.Millisecond)
+	p.Close()
+	wg.Wait()
+	if err := p.Submit(context.Background(), Job{}); !errors.Is(err, ErrClosed) {
+		t.Fatalf("after close: %v", err)
+	}
+}
+
+func TestCancelDropsQueuedJobs(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var got atomic.Int64
+	p := NewPool(ctx, 1, 8, func(c context.Context, _ Job) error {
+		if got.Add(1) == 1 {
+			close(started)
+			select {
+			case <-release:
+			case <-c.Done():
+			}
+		}
+		return nil
+	})
+
+	for i := 0; i < 5; i++ {
+		if err := p.Submit(context.Background(), Job{UserID: int64(i)}); err != nil {
+			t.Fatalf("submit: %v", err)
+		}
+	}
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not start")
+	}
+	cancel()
+	close(release)
+	p.Close()
+	if got.Load() != 1 {
+		t.Fatalf("processed=%d want 1 (queued jobs dropped)", got.Load())
 	}
 }
 
