@@ -21,7 +21,7 @@ func main() {
 
 	// Contrast: wrapping with %v loses the sentinel for errors.Is.
 	bad := fmt.Errorf("enroll failed: %v", course.ErrNotFound)
-	fmt.Println("Is with %v wrap:", errors.Is(bad, course.ErrNotFound))
+	fmt.Println("Is with percent-v wrap:", errors.Is(bad, course.ErrNotFound))
 	good := fmt.Errorf("enroll failed: %w", course.ErrNotFound)
-	fmt.Println("Is with %w wrap:", errors.Is(good, course.ErrNotFound))
+	fmt.Println("Is with percent-w wrap:", errors.Is(good, course.ErrNotFound))
 }

@@ -28,8 +28,8 @@ Expected (shape):
 ```text
 enroll error: enroll user 42 into course 9: course: not found
 404-ish
-Is with %v wrap: false
-Is with %w wrap: true
+Is with percent-v wrap: false
+Is with percent-w wrap: true
 ```
 
 ## Try yourself
