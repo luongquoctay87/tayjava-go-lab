@@ -44,7 +44,7 @@ func main() {
 	svc := course.NewService(repo)
 	counters := &metrics.Counters{}
 	courses := api.NewCourseHandler(svc, cfg.EnrollmentCapDefault)
-	enrollments := api.NewEnrollmentHandler(svc, pool, counters, resilience.NewIdempotencyStore())
+	enrollments := api.NewEnrollmentHandler(svc, pool, counters, resilience.NewIdempotency())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.Healthz)

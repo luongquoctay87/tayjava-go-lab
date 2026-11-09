@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/tayjava/go-lab/internal/api"
 	"github.com/tayjava/go-lab/internal/course"
+	"github.com/tayjava/go-lab/internal/resilience"
 )
 
 // stubRepo fakes Repository so handler tests need no Postgres.
@@ -187,5 +189,121 @@ func TestEnrollmentCreateCanceledContext(t *testing.T) {
 	}
 	if eb.Code != "INTERNAL" {
 		t.Fatalf("code=%q want INTERNAL", eb.Code)
+	}
+}
+
+func postEnroll(h api.EnrollmentHandler, body, key string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/api/enrollments", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	if key != "" {
+		req.Header.Set("Idempotency-Key", key)
+	}
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+	return rec
+}
+
+func TestIdempotentEnrollReplayAndMismatch(t *testing.T) {
+	repo := course.NewMemoryRepo()
+	h := api.NewEnrollmentHandler(course.NewService(repo), nil, nil, resilience.NewIdempotency())
+
+	body := `{"courseId":1,"userId":7}`
+	first := postEnroll(h, body, "abc")
+	second := postEnroll(h, body, "abc")
+	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
+		t.Fatalf("first=%d second=%d body=%s", first.Code, second.Code, second.Body.String())
+	}
+	if first.Body.String() != second.Body.String() {
+		t.Fatalf("replay body=%s want=%s", second.Body.String(), first.Body.String())
+	}
+
+	mismatch := postEnroll(h, `{"courseId":2,"userId":7}`, "abc")
+	if mismatch.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("mismatch status=%d body=%s", mismatch.Code, mismatch.Body.String())
+	}
+
+	other := postEnroll(h, `{"courseId":1,"userId":8}`, "other")
+	if other.Code != http.StatusCreated {
+		t.Fatalf("other key status=%d body=%s", other.Code, other.Body.String())
+	}
+
+	missing := postEnroll(h, body, "")
+	if missing.Code != http.StatusBadRequest {
+		t.Fatalf("missing key status=%d", missing.Code)
+	}
+
+	list, err := repo.ListEnrollments(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("enrollments=%d want 2", len(list))
+	}
+}
+
+// blockingRepo stalls the first Get so a duplicate key can arrive mid-flight.
+type blockingRepo struct {
+	inner   course.Repository
+	hold    <-chan struct{}
+	started chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingRepo) Get(ctx context.Context, id int64) (course.Course, error) {
+	b.once.Do(func() { close(b.started) })
+	<-b.hold
+	return b.inner.Get(ctx, id)
+}
+
+func (b *blockingRepo) Save(ctx context.Context, c course.Course) (course.Course, error) {
+	return b.inner.Save(ctx, c)
+}
+
+func (b *blockingRepo) CountEnrollments(ctx context.Context, courseID int64) (int, error) {
+	return b.inner.CountEnrollments(ctx, courseID)
+}
+
+func (b *blockingRepo) InsertEnrollment(ctx context.Context, courseID, userID int64) (course.Enrollment, error) {
+	return b.inner.InsertEnrollment(ctx, courseID, userID)
+}
+
+func (b *blockingRepo) ListEnrollments(ctx context.Context, courseID int64) ([]course.Enrollment, error) {
+	return b.inner.ListEnrollments(ctx, courseID)
+}
+
+func TestIdempotentEnrollInFlight(t *testing.T) {
+	hold := make(chan struct{})
+	repo := &blockingRepo{
+		inner:   course.NewMemoryRepo(),
+		hold:    hold,
+		started: make(chan struct{}),
+	}
+	h := api.NewEnrollmentHandler(course.NewService(repo), nil, nil, resilience.NewIdempotency())
+	body := `{"courseId":1,"userId":7}`
+
+	var first *httptest.ResponseRecorder
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		first = postEnroll(h, body, "abc")
+	}()
+	<-repo.started
+
+	second := postEnroll(h, body, "abc")
+	if second.Code != http.StatusConflict {
+		t.Fatalf("in-flight status=%d body=%s", second.Code, second.Body.String())
+	}
+	if second.Header().Get("Retry-After") != "1" {
+		t.Fatalf("Retry-After=%q", second.Header().Get("Retry-After"))
+	}
+
+	close(hold)
+	<-done
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first status=%d body=%s", first.Code, first.Body.String())
+	}
+	replay := postEnroll(h, body, "abc")
+	if replay.Code != http.StatusCreated || replay.Body.String() != first.Body.String() {
+		t.Fatalf("replay status=%d body=%s", replay.Code, replay.Body.String())
 	}
 }

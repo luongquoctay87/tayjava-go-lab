@@ -1,12 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
-
 	"time"
 
 	"github.com/tayjava/go-lab/internal/course"
@@ -20,12 +22,12 @@ type EnrollmentHandler struct {
 	svc     *course.Service
 	notify  *notify.Pool
 	metrics *metrics.Counters
-	idem    *resilience.IdempotencyStore
+	idem    *resilience.Idempotency
 }
 
 // NewEnrollmentHandler constructs an EnrollmentHandler.
-// notify / metrics / idem may be nil.
-func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool, m *metrics.Counters, idem *resilience.IdempotencyStore) EnrollmentHandler {
+// notify / metrics / idem may be nil. A non-nil idem store requires Idempotency-Key.
+func NewEnrollmentHandler(svc *course.Service, pool *notify.Pool, m *metrics.Counters, idem *resilience.Idempotency) EnrollmentHandler {
 	return EnrollmentHandler{svc: svc, notify: pool, metrics: m, idem: idem}
 }
 
@@ -51,10 +53,13 @@ func (in enrollBody) validateFlat() string {
 	return ""
 }
 
-func decodeEnrollBody(w http.ResponseWriter, r *http.Request) (enrollBody, string) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	return io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+}
+
+func decodeEnrollBody(raw []byte) (enrollBody, string) {
 	var in enrollBody
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&in); err != nil {
 		return in, "invalid json"
@@ -69,7 +74,12 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusBadRequest, "VALIDATION", "id must be a positive integer")
 		return
 	}
-	in, msg := decodeEnrollBody(w, r)
+	raw, err := readBody(w, r)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "VALIDATION", "invalid body")
+		return
+	}
+	in, msg := decodeEnrollBody(raw)
 	if msg != "" {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
@@ -78,7 +88,7 @@ func (h EnrollmentHandler) CreateNested(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	h.enroll(w, r, courseID, in.UserID)
+	h.enroll(w, r, courseID, in.UserID, raw)
 }
 
 // List handles GET /courses/{id}/enrollments.
@@ -103,7 +113,12 @@ func (h EnrollmentHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Create handles POST /api/enrollments with courseId + userId (kept for earlier lab curls).
 func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	in, msg := decodeEnrollBody(w, r)
+	raw, err := readBody(w, r)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "VALIDATION", "invalid body")
+		return
+	}
+	in, msg := decodeEnrollBody(raw)
 	if msg != "" {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
@@ -112,10 +127,10 @@ func (h EnrollmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "VALIDATION", msg)
 		return
 	}
-	h.enroll(w, r, in.CourseID, in.UserID)
+	h.enroll(w, r, in.CourseID, in.UserID, raw)
 }
 
-func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, courseID, userID int64) {
+func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, courseID, userID int64, rawBody []byte) {
 	key := r.Header.Get("Idempotency-Key")
 	slog.Info("enroll_attempt",
 		"request_id", RequestIDFrom(r.Context()),
@@ -123,13 +138,32 @@ func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, course
 		"user_id", userID,
 		"idempotency_key", key,
 	)
-	if key != "" && h.idem != nil {
-		if id, ok := h.idem.Get(key); ok {
-			WriteJSON(w, http.StatusOK, course.Enrollment{ID: id, CourseID: courseID, UserID: userID})
-			return
-		}
+	if h.idem == nil {
+		status, body := h.performEnroll(r, courseID, userID)
+		writeStored(w, status, body)
+		return
+	}
+	if key == "" {
+		WriteError(w, http.StatusBadRequest, "VALIDATION", "missing Idempotency-Key")
+		return
 	}
 
+	status, resp, err := h.idem.Do(userID, key, rawBody, func() (int, []byte) {
+		return h.performEnroll(r, courseID, userID)
+	})
+	switch {
+	case errors.Is(err, resilience.ErrKeyReused):
+		WriteError(w, http.StatusUnprocessableEntity, "KEY_REUSED", err.Error())
+	case errors.Is(err, resilience.ErrInProgress):
+		w.Header().Set("Retry-After", "1")
+		WriteError(w, http.StatusConflict, "IN_PROGRESS", err.Error())
+	default:
+		writeStored(w, status, resp)
+	}
+}
+
+// performEnroll reserves a seat. It runs outside the idempotency mutex.
+func (h EnrollmentHandler) performEnroll(r *http.Request, courseID, userID int64) (int, []byte) {
 	start := time.Now()
 	en, err := h.svc.Enroll(r.Context(), courseID, userID)
 	if err != nil {
@@ -140,15 +174,21 @@ func (h EnrollmentHandler) enroll(w http.ResponseWriter, r *http.Request, course
 			"user_id", userID,
 			"err", err.Error(),
 		)
-		MapDomainError(w, err)
-		return
+		status, body := domainErrorResponse(err)
+		if status >= 500 {
+			slog.Error("internal_error", "err", err.Error())
+		}
+		return status, jsonBody(body)
 	}
 	h.observe(true, time.Since(start))
-	if key != "" && h.idem != nil {
-		h.idem.Put(key, en.ID)
-	}
 	h.submitNotify(r, en)
-	WriteJSON(w, http.StatusCreated, en)
+	return http.StatusCreated, jsonBody(en)
+}
+
+func writeStored(w http.ResponseWriter, status int, body []byte) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
 }
 
 func (h EnrollmentHandler) observe(ok bool, d time.Duration) {

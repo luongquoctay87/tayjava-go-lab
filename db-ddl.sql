@@ -18,10 +18,12 @@ CREATE TABLE IF NOT EXISTS enrollments (
     UNIQUE (course_id, user_id)
 );
 
--- Optional (lesson 35+): durable Idempotency-Key store for enroll retries.
--- The in-process lab also keeps an in-memory map; prefer this table in Postgres.
+-- Optional (lesson 35+): durable Idempotency-Key store, unique per user.
+-- The lab handler uses an in-memory map with the same (user_id, key) scope.
 CREATE TABLE IF NOT EXISTS idempotency_keys (
-    key            TEXT PRIMARY KEY,
-    enrollment_id  BIGINT NOT NULL REFERENCES enrollments (id),
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    user_id       BIGINT NOT NULL,
+    key           TEXT   NOT NULL,
+    enrollment_id BIGINT NOT NULL REFERENCES enrollments (id),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, key)
 );
